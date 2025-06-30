@@ -1,0 +1,53 @@
+{
+  "name": "rete-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@types/styled-components": "^5.1.34",
+    "@types/three": "^0.156.0",
+    "elkjs": "^0.8.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "rete": "^2.0.6",
+    "rete-area-3d-plugin": "^2.0.5",
+    "rete-area-plugin": "^2.1.3",
+    "rete-auto-arrange-plugin": "^2.0.2",
+    "rete-connection-plugin": "^2.0.5",
+    "rete-react-plugin": "^2.0.7",
+    "rete-render-utils": "^2.0.3",
+    "rete-scopes-plugin": "^2.1.1",
+    "styled-components": "^5.3.11",
+    "three": "^0.156.1",
+    "web-worker": "^1.5.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "@types/node": "^24.0.7",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.5.2",
+    "eslint": "^9.29.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.2.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.34.1",
+    "vite": "^7.0.0"
+  },
+  "keywords": [
+    "rete",
+    "workflow",
+    "editor",
+    "visual-programming"
+  ],
+  "author": "",
+  "license": "MIT",
+  "description": "A visual workflow editor built with RETE.js"
+}

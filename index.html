@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RETE.js Workflow Editor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <div class="toolbar">
+            <h1>Workflow Editor</h1>
+            <div class="node-palette">
+                <h3>Nodes</h3>
+                <div class="node-item" data-type="trigger">Trigger</div>
+                <div class="node-item" data-type="http">HTTP Request</div>
+                <div class="node-item" data-type="condition">Condition</div>
+                <div class="node-item" data-type="log">Log</div>
+            </div>
+        </div>
+        <div id="editor" class="editor"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
