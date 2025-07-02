@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build --base=./",
     "preview": "vite preview",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "homepage": "./",
   "dependencies": {
     "@types/styled-components": "^5.1.34",
     "@types/three": "^0.156.0",
