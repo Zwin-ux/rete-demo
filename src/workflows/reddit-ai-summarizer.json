@@ -1,0 +1,180 @@
+{
+  "nodes": [
+    {
+      "id": "start-1",
+      "type": "start",
+      "position": {
+        "x": 100,
+        "y": 200
+      },
+      "data": {
+        "name": "Start Workflow"
+      }
+    },
+    {
+      "id": "reddit-1",
+      "type": "reddit-scraper",
+      "position": {
+        "x": 300,
+        "y": 200
+      },
+      "data": {
+        "name": "Reddit Scraper",
+        "subreddit": "artificial",
+        "limit": 5,
+        "time": "day"
+      }
+    },
+    {
+      "id": "filter-1",
+      "type": "keyword-filter",
+      "position": {
+        "x": 550,
+        "y": 200
+      },
+      "data": {
+        "name": "AI News Filter",
+        "keywords": "AI, GPT, machine learning, neural network",
+        "caseSensitive": false
+      }
+    },
+    {
+      "id": "summarizer-1",
+      "type": "summarizer",
+      "position": {
+        "x": 800,
+        "y": 200
+      },
+      "data": {
+        "name": "AI News Summarizer",
+        "summaryLength": "medium",
+        "format": "bullet",
+        "focusPoints": "key developments, implications, future impact"
+      }
+    },
+    {
+      "id": "llm-1",
+      "type": "llm-agent",
+      "position": {
+        "x": 1050,
+        "y": 200
+      },
+      "data": {
+        "name": "AI Analyst",
+        "model": "gpt-4",
+        "temperature": 0.7,
+        "systemPrompt": "You are an AI analyst that provides insightful analysis of AI-related news. Focus on technical aspects and potential impact.",
+        "maxTokens": 500
+      }
+    },
+    {
+      "id": "console-1",
+      "type": "console-log",
+      "position": {
+        "x": 1300,
+        "y": 200
+      },
+      "data": {
+        "name": "Output Results"
+      }
+    },
+    {
+      "id": "discord-1",
+      "type": "discord-webhook",
+      "position": {
+        "x": 1300,
+        "y": 350
+      },
+      "data": {
+        "name": "Discord Notification",
+        "webhookUrl": "YOUR_DISCORD_WEBHOOK_URL",
+        "username": "AI News Bot",
+        "useEmbed": true,
+        "embedColor": "#5865F2"
+      }
+    },
+    {
+      "id": "memory-write-1",
+      "type": "memory-write",
+      "position": {
+        "x": 1050,
+        "y": 400
+      },
+      "data": {
+        "name": "Store Results",
+        "memoryKey": "last_ai_news_analysis",
+        "autoExecute": true
+      }
+    },
+    {
+      "id": "memory-read-1",
+      "type": "memory-read",
+      "position": {
+        "x": 800,
+        "y": 400
+      },
+      "data": {
+        "name": "Previous Analysis",
+        "memoryKey": "last_ai_news_analysis"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn-1",
+      "source": "start-1",
+      "sourceOutput": "trigger",
+      "target": "reddit-1",
+      "targetInput": "trigger"
+    },
+    {
+      "id": "conn-2",
+      "source": "reddit-1",
+      "sourceOutput": "posts",
+      "target": "filter-1",
+      "targetInput": "input"
+    },
+    {
+      "id": "conn-3",
+      "source": "filter-1",
+      "sourceOutput": "output",
+      "target": "summarizer-1",
+      "targetInput": "text"
+    },
+    {
+      "id": "conn-4",
+      "source": "summarizer-1",
+      "sourceOutput": "summary",
+      "target": "llm-1",
+      "targetInput": "input"
+    },
+    {
+      "id": "conn-5",
+      "source": "llm-1",
+      "sourceOutput": "output",
+      "target": "console-1",
+      "targetInput": "input"
+    },
+    {
+      "id": "conn-6",
+      "source": "llm-1",
+      "sourceOutput": "output",
+      "target": "discord-1",
+      "targetInput": "message"
+    },
+    {
+      "id": "conn-7",
+      "source": "llm-1",
+      "sourceOutput": "output",
+      "target": "memory-write-1",
+      "targetInput": "value"
+    },
+    {
+      "id": "conn-8",
+      "source": "memory-read-1",
+      "sourceOutput": "value",
+      "target": "summarizer-1",
+      "targetInput": "compareWith"
+    }
+  ]
+}
