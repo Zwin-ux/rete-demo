@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import type { Node as ReteNode } from 'rete';
-import { NodeExecutionState } from '../types/node.types';
+import { NodeExecutionState, NodeExecutionResult } from '../types/node.types';
 
 // Define a local type for the node
 type NodeType = {
@@ -42,78 +42,141 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
     );
   };
 
-  const renderLogs = () => (
-    <div className="space-y-1 text-xs font-mono">
-      {executionState?.result?.logs?.length ? (
-        executionState.result.logs.map((log, i) => (
-          <div key={i} className="p-1 border-b border-gray-100">
-            {log}
-          </div>
-        ))
-      ) : (
-        <div className="text-gray-500 italic">No logs available</div>
-      )}
-    </div>
-  );
+  const renderLogs = () => {
+    const logs = executionState?.result?.logs;
+    
+    return (
+      <div className="space-y-1 text-xs font-mono">
+        {logs && logs.length > 0 ? (
+          logs.map((log, i) => {
+            // Handle different log types
+            let logContent: ReactNode;
+            
+            if (typeof log === 'string' || typeof log === 'number' || typeof log === 'boolean') {
+              logContent = String(log);
+            } else if (log === null) {
+              logContent = 'null';
+            } else if (log === undefined) {
+              logContent = 'undefined';
+            } else if (log instanceof Error) {
+              logContent = log.message || 'Error occurred';
+            } else if (typeof log === 'object') {
+              try {
+                logContent = JSON.stringify(log, null, 2);
+              } catch (e) {
+                logContent = '[Object]';
+              }
+            } else {
+              logContent = String(log);
+            }
+            
+            return (
+              <div key={i} className="p-1 border-b border-gray-100">
+                {logContent}
+              </div>
+            );
+          })
+        ) : (
+          <div className="text-gray-400 italic">No logs available</div>
+        )}
+      </div>
+    );
+  };
 
   const renderInputs = () => {
-    const inputs = executionState?.result?.inputs || {};
+    const inputs = executionState?.result?.inputs;
+    
+    if (!inputs || typeof inputs !== 'object') {
+      return <div className="text-gray-400 italic">No input data available</div>;
+    }
+    
+    const inputEntries = Object.entries(inputs);
     
     return (
       <div className="space-y-2">
-        {Object.keys(inputs).length > 0 ? (
-          Object.entries(inputs).map(([key, value]) => (
-            <div key={key} className="border-b border-gray-100 pb-2">
-              <div className="font-semibold text-sm">{key}</div>
-              <div className="text-xs text-gray-700 break-words">
-                {typeof value === 'object' 
-                  ? JSON.stringify(value, null, 2) 
-                  : String(value)}
+        {inputEntries.length > 0 ? (
+          inputEntries.map(([key, value]) => {
+            let displayValue: ReactNode;
+            
+            try {
+              displayValue = typeof value === 'object' && value !== null
+                ? <pre className="whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+                : String(value);
+            } catch (e) {
+              displayValue = '[Unserializable value]';
+            }
+            
+            return (
+              <div key={key} className="border-b border-gray-100 pb-2">
+                <div className="font-semibold text-sm">{key}</div>
+                <div className="text-xs text-gray-700 break-words">
+                  {displayValue}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
-          <div className="text-gray-500 italic">No input data available</div>
+          <div className="text-gray-400 italic">No input data available</div>
         )}
       </div>
     );
   };
 
   const renderOutputs = () => {
-    const outputs = executionState?.result?.output || {};
+    const outputs = executionState?.result?.outputs || executionState?.result?.output;
+    
+    if (!outputs || typeof outputs !== 'object') {
+      return <div className="text-gray-400 italic">No output data available</div>;
+    }
+    
+    const outputEntries = Object.entries(outputs);
     
     return (
       <div className="space-y-2">
-        {Object.keys(outputs).length > 0 ? (
-          Object.entries(outputs).map(([key, value]) => (
-            <div key={key} className="border-b border-gray-100 pb-2">
-              <div className="font-semibold text-sm">{key}</div>
-              <div className="text-xs text-gray-700 break-words">
-                {typeof value === 'object' 
-                  ? JSON.stringify(value, null, 2) 
-                  : String(value)}
+        {outputEntries.length > 0 ? (
+          outputEntries.map(([key, value]) => {
+            let displayValue: ReactNode;
+            
+            try {
+              displayValue = typeof value === 'object' && value !== null
+                ? <pre className="whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+                : String(value);
+            } catch (e) {
+              displayValue = '[Unserializable value]';
+            }
+            
+            return (
+              <div key={key} className="border-b border-gray-100 pb-2">
+                <div className="font-semibold text-sm">{key}</div>
+                <div className="text-xs text-gray-700 break-words">
+                  {displayValue}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         ) : (
-          <div className="text-gray-500 italic">No output data available</div>
+          <div className="text-gray-400 italic">No output data available</div>
         )}
       </div>
     );
   };
 
   const renderState = () => {
-    if (!executionState) return <div className="text-gray-500 italic">No execution data available</div>;
+    if (!executionState) {
+      return <div className="text-gray-400 italic">No execution data available</div>;
+    }
     
     const duration = executionState.endTime && executionState.startTime
       ? `${executionState.endTime - executionState.startTime}ms`
       : 'N/A';
     
+    const status = executionState.status ? String(executionState.status) : 'unknown';
+    
     return (
       <div className="space-y-3">
         <div>
           <div className="text-xs text-gray-500">Status</div>
-          <div className="font-medium">{executionState.status}</div>
+          <div className="font-medium">{status}</div>
         </div>
         
         <div>
@@ -124,17 +187,28 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
         {executionState.error && (
           <div>
             <div className="text-xs text-gray-500">Error</div>
-            <div className="text-red-600 text-sm break-words">{executionState.error.message}</div>
+            <div className="text-red-600 text-sm break-words">
+              {executionState.error instanceof Error 
+                ? executionState.error.message 
+                : String(executionState.error)}
+            </div>
           </div>
         )}
         
-        <div>
-          <div className="text-xs text-gray-500">Node ID</div>
-          <div className="font-mono text-xs break-all">{node.id}</div>
-        </div>
+        {node && (
+          <div>
+            <div className="text-xs text-gray-500">Node ID</div>
+            <div className="font-mono text-xs break-all">{node.id}</div>
+          </div>
+        )}
       </div>
     );
   };
+
+  // Safely get the node name from node data
+  const nodeName = node?.data && typeof node.data === 'object' && 'name' in node.data
+    ? String(node.data.name)
+    : 'Node';
 
   return (
     <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
@@ -144,7 +218,7 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
       >
         <div className="flex items-center space-x-2">
           <h3 className="font-medium text-sm">
-            {node.data.name || 'Node'}
+            {nodeName}
           </h3>
           {renderStatusBadge()}
         </div>

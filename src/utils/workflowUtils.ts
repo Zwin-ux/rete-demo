@@ -36,7 +36,7 @@ type NodeScheme = {
 };
 
 // Define types for the node editor
-type NodeType = Node<{ type: string }> & {
+type NodeType = ReteNode & {
   data: {
     type: string;
     [key: string]: unknown;
@@ -44,7 +44,7 @@ type NodeType = Node<{ type: string }> & {
   position: [number, number];
 };
 
-type ConnectionType = Connection<{ source: string; target: string }> & {
+type ConnectionType = ReteConnection & {
   source: string;
   target: string;
   sourceOutput: string;
@@ -74,7 +74,11 @@ export async function loadWorkflow(
   for (const nodeData of workflow.nodes) {
     try {
       const node = await createNode(editor, nodeData);
-      nodeMap.set(nodeData.id, node);
+      if (node) {
+        nodeMap.set(nodeData.id, node);
+      } else {
+        console.error(`Failed to create node ${nodeData.id}: node is null`);
+      }
     } catch (error) {
       console.error(`Failed to create node ${nodeData.id}:`, error);
     }
@@ -91,11 +95,27 @@ export async function loadWorkflow(
         continue;
       }
       
-      if (sourceNode && targetNode) {
-        await editor.connect(
-          sourceNode.outputs.get(conn.sourceOutput),
-          targetNode.inputs.get(conn.targetInput)
-        );
+      // Type assertion to access the outputs and inputs safely
+      const sourceNodeAny = sourceNode as any;
+      const targetNodeAny = targetNode as any;
+      
+      if (sourceNodeAny.outputs && targetNodeAny.inputs) {
+        const sourceOutput = sourceNodeAny.outputs.get(conn.sourceOutput);
+        const targetInput = targetNodeAny.inputs.get(conn.targetInput);
+        
+        if (sourceOutput && targetInput) {
+          // Use type assertion for the connect method
+          const editorAny = editor as any;
+          if (typeof editorAny.connect === 'function') {
+            await editorAny.connect(sourceOutput, targetInput);
+          } else {
+            console.warn(`Skipping connection ${conn.id}: editor.connect is not a function`);
+          }
+        } else {
+          console.warn(`Skipping connection ${conn.id}: source output or target input not found`);
+        }
+      } else {
+        console.warn(`Skipping connection ${conn.id}: source or target node is missing inputs/outputs`);
       }
     } catch (error) {
       console.error(`Failed to create connection ${conn.id}:`, error);
@@ -103,13 +123,16 @@ export async function loadWorkflow(
   }
   
   // Arrange nodes to prevent overlap
-  await editor.view.arrange({
-    nodeMargin: 100,
-    depth: null,
-    animate: true
-  });
-  
-  return editor;
+  if ('view' in editor && typeof editor.view === 'object' && editor.view !== null) {
+    const editorView = editor.view as any;
+    if (typeof editorView.arrange === 'function') {
+      await editorView.arrange({
+        nodeMargin: 100,
+        depth: null,
+        animate: true
+      });
+    }
+  }
 }
 
 /**
@@ -181,20 +204,42 @@ async function createNode(
 export async function exportWorkflow(
   editor: NodeEditor<NodeScheme>
 ): Promise<Workflow> {
-  if (!editor) return { nodes: [], connections: [] };
+  if (!editor) {
+    return { 
+      id: 'temp-' + Date.now(),
+      name: 'Untitled Workflow',
+      nodes: [], 
+      connections: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  }
   
-  const nodes = editor.getNodes() as unknown as Array<Node<{ type: string }> & { position: [number, number] }>;
-  const connections = editor.getConnections() as unknown as Array<Connection>;
+  const nodes = Array.isArray(editor.getNodes) ? editor.getNodes() : [];
+  const connections = Array.isArray(editor.getConnections) ? editor.getConnections() : [];
   
-  const workflowNodes: WorkflowNode[] = nodes.map(node => {
-    const nodeData = {
+  // Type assertions for nodes and connections
+  const typedNodes = nodes as Array<ReteNode>;
+  const typedConnections = connections as Array<ReteConnection>;
+  
+  const workflowNodes: WorkflowNode[] = typedNodes.map(node => {
+    const nodeData: WorkflowNode = {
       id: node.id,
-      type: node.data?.type || 'unknown',
+      type: typeof node.data === 'object' && node.data !== null && 'type' in node.data 
+        ? String(node.data.type) 
+        : 'unknown',
       position: { 
-        x: node.position?.[0] || 0, 
-        y: node.position?.[1] || 0 
+        x: Array.isArray(node.position) && node.position.length >= 2 
+          ? Number(node.position[0]) || 0 
+          : 0, 
+        y: Array.isArray(node.position) && node.position.length >= 2 
+          ? Number(node.position[1]) || 0 
+          : 0
       },
-      data: { ...node.data },
+      data: typeof node.data === 'object' && node.data !== null 
+        ? { ...node.data } 
+        : {},
       inputs: {},
       outputs: {},
       controls: {}
@@ -202,22 +247,21 @@ export async function exportWorkflow(
     return nodeData;
   });
   
-  const workflowConnections = connections
-    .map(connection => {
-      if (!connection.source || !connection.target) {
-        console.warn('Invalid connection found, skipping:', connection);
-        return null;
-      }
-      
-      return {
-        id: connection.id,
-        source: connection.source,
-        sourceOutput: connection.sourceOutput,
-        target: connection.target,
-        targetInput: connection.targetInput
-      };
-    })
-    .filter((conn): conn is WorkflowConnection => conn !== null);
+  const workflowConnections: WorkflowConnection[] = typedConnections
+    .filter(conn => 
+      conn && 
+      typeof conn.source === 'string' && 
+      typeof conn.target === 'string' &&
+      conn.source && 
+      conn.target
+    )
+    .map(connection => ({
+      id: typeof connection.id === 'string' ? connection.id : `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      source: connection.source,
+      target: connection.target,
+      sourceOutput: typeof connection.sourceOutput === 'string' ? connection.sourceOutput : 'output',
+      targetInput: typeof connection.targetInput === 'string' ? connection.targetInput : 'input'
+    }));
   
   // Create the workflow object with required properties
   const workflow: Workflow = {
@@ -261,11 +305,12 @@ export async function loadSampleWorkflow(
  * Save workflow to local storage
  * @param workflow The workflow to save
  * @param name The name to save the workflow as
+ * @returns True if the workflow was saved successfully, false otherwise
  */
 export function saveWorkflowToLocalStorage(
   workflow: Workflow, 
   name: string
-): void {
+): boolean {
   try {
     const workflows = getWorkflowsFromLocalStorage();
     workflows[name] = workflow;
@@ -305,11 +350,12 @@ export function getWorkflowsFromLocalStorage(): Record<string, Workflow> {
 export function deleteWorkflowFromLocalStorage(name: string): boolean {
   try {
     const workflows = getWorkflowsFromLocalStorage();
-    if (!workflows[name]) return false;
-    
-    delete workflows[name];
-    localStorage.setItem('rete-workflows', JSON.stringify(workflows));
-    return true;
+    if (workflows[name]) {
+      delete workflows[name];
+      localStorage.setItem('rete-workflows', JSON.stringify(workflows));
+      return true;
+    }
+    return false;
   } catch (error) {
     console.error('Failed to delete workflow from local storage:', error);
     return false;
