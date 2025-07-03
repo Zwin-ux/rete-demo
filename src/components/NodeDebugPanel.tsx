@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Node } from 'rete';
+import type { Node as ReteNode } from 'rete';
 import { NodeExecutionState } from '../types/node.types';
 
+// Define a local type for the node
+type NodeType = {
+  id: string;
+  data: Record<string, unknown>;
+  position: [number, number];
+  inputs?: Record<string, unknown>;
+  outputs?: Record<string, unknown>;
+};
+
 interface NodeDebugPanelProps {
-  node: Node | null;
+  node: NodeType | null;
   executionState: NodeExecutionState | null;
   onClose: () => void;
 }

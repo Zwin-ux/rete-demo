@@ -1,23 +1,80 @@
-import { Node, NodeEditor } from 'rete';
-import { NodeData, NodeContext, NodeExecutionResult } from '../types/node.types';
+import { Node } from 'rete';
+import type { NodeEditor, NodeData as ReteNodeData } from 'rete';
+import { NodeContext, NodeExecutionResult } from '../types/node.types';
 import { NodeMemory } from './memory';
 
-export abstract class BaseNode extends Node {
+// Define a type for the node editor's scheme
+type NodeScheme = {
+  Node: {
+    id: string;
+    data: Record<string, unknown>;
+    position: [number, number];
+  };
+  Connection: {
+    id: string;
+    source: string;
+    target: string;
+    sourceOutput: string;
+    targetInput: string;
+  };
+};
+
+declare module 'rete/types/events' {
+  interface EventsTypes {
+    [key: string]: any;
+  }
+}
+
+// Extend the Rete NodeData interface to include our custom properties
+declare module 'rete/types/core/data' {
+  interface NodeData {
+    id: string;
+    name: string;
+    type: string;
+    [key: string]: any;
+  }
+}
+
+// Extend the base node data with our required properties
+export interface BaseNodeData extends Record<string, unknown> {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export abstract class BaseNode<T extends BaseNodeData = BaseNodeData> extends Node {
   protected logs: string[] = [];
   protected memory: NodeMemory;
-  protected editor: NodeEditor;
+  protected editor: NodeEditor<NodeScheme>;
+  
+  // Override the data property to use our extended type
+  public data: T;
 
-  constructor(editor: NodeEditor, key: string, name: string) {
+  constructor(editor: NodeEditor<NodeScheme>, key: string, name: string) {
     super(key);
     this.editor = editor;
-    this.data.name = name;
     this.memory = new NodeMemory(this.id);
+    
+    // Initialize with default data
+    this.data = {
+      id: this.id,
+      name,
+      type: key,
+      // Add any other default properties here
+    } as T;
   }
-
+  
+  /**
+   * Logs a message with a timestamp
+   * @param message The message to log
+   */
   protected log(message: string): void {
     const timestamp = new Date().toISOString();
-    this.logs.push(`[${timestamp}] ${message}`);
-    console.log(`[${this.data.name}] ${message}`);
+    const logMessage = `[${timestamp}] ${message}`;
+    this.logs.push(logMessage);
+    // Use optional chaining to safely access data.name
+    console.log(`[${this.data?.name || 'Node'}] ${message}`);
+    console.log(`[${this.data?.name || 'Node'}] ${message}`);
   }
 
   protected clearLogs(): void {

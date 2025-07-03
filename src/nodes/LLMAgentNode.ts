@@ -1,10 +1,19 @@
 import { NodeEditor } from 'rete';
 import { BaseNode } from '../core/BaseNode';
 import { NodeInput, NodeOutput, NodeControl } from '../types/node.types';
+import { mockLLMRequest, isMockMode } from '../utils/mockLLM';
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+interface LLMControlData {
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+  apiKey: string;
 }
 
 export class LLMAgentNode extends BaseNode {
@@ -198,6 +207,20 @@ export class LLMAgentNode extends BaseNode {
     this.log('Sending to LLM: ' + userMessage.content.substring(0, 100) + '...');
 
     try {
+      // Use mock mode if no API key is provided
+      if (isMockMode() && !this.apiKey) {
+        this.log('⚠️ Using mock LLM mode - no API key provided');
+        const response = await mockLLMRequest(input, systemPrompt);
+        return {
+          output: response,
+          usage: {
+            prompt_tokens: Math.floor(input.length / 4),
+            completion_tokens: Math.floor(response.length / 4),
+            total_tokens: Math.floor((input.length + response.length) / 4)
+          }
+        };
+      }
+
       const response = await this.callOpenAI(this.messages);
       
       const assistantMessage = response.choices[0].message;

@@ -1,17 +1,43 @@
-import { NodeEditor } from 'rete';
-import { BaseNode } from '../core/BaseNode';
-import { NodeInput, NodeOutput, NodeControl } from '../types/node.types';
+import type { NodeEditor } from 'rete';
+import { BaseNode, BaseNodeData } from '../core/BaseNode';
+import { NodeInput, NodeOutput, NodeControl, NodeContext } from '../types/node.types';
+import { isMockMode } from '../utils/mockLLM';
 
-interface RedditPost {
+// Define a type for the Reddit API response
+type RedditApiResponse = {
+  data: {
+    children: Array<{
+      data: {
+        title: string;
+        url: string;
+        score: number;
+        permalink: string;
+        author: string;
+        created_utc: number;
+        selftext?: string;
+      };
+    }>;
+  };
+};
+
+interface RedditScraperNodeData extends BaseNodeData {
+  subreddit: string;
+  limit: number;
+  time: 'hour' | 'day' | 'week' | 'month' | 'year' | 'all';
+  [key: string]: unknown;
+}
+
+export interface RedditPost {
   title: string;
   url: string;
   score: number;
   permalink: string;
   author: string;
   created_utc: number;
+  selftext?: string;
 }
 
-export class RedditScraperNode extends BaseNode {
+export class RedditScraperNode extends BaseNode<RedditScraperNodeData> {
   private static readonly DEFAULT_LIMIT = 10;
   private static readonly DEFAULT_TIME = 'day'; // hour, day, week, month, year, all
 
@@ -24,7 +50,7 @@ export class RedditScraperNode extends BaseNode {
       subreddit: 'ai',
       limit: RedditScraperNode.DEFAULT_LIMIT,
       time: RedditScraperNode.DEFAULT_TIME,
-    };
+    } as RedditScraperNodeData;
   }
 
   getInputs(): NodeInput[] {
@@ -33,8 +59,8 @@ export class RedditScraperNode extends BaseNode {
 
   getOutputs(): NodeOutput[] {
     return [
-      { name: 'posts', type: 'RedditPost[]', description: 'Array of Reddit posts' },
-      { name: 'count', type: 'number', description: 'Number of posts fetched' },
+      { name: 'posts', type: 'RedditPost[]' },
+      { name: 'count', type: 'number' },
     ];
   }
 
@@ -43,111 +69,105 @@ export class RedditScraperNode extends BaseNode {
       {
         type: 'text',
         key: 'subreddit',
-        label: 'Subreddit',
-        placeholder: 'Enter subreddit name',
-        value: this.data.subreddit || 'ai',
-        onChange: (value: string) => {
-          this.data.subreddit = value;
-          this.update();
+        value: this.data?.subreddit || 'ai',
+        setValue: (value: any) => {
+          if (this.data) {
+            this.data.subreddit = String(value);
+          }
         },
-      },
+      } as NodeControl,
       {
         type: 'number',
         key: 'limit',
-        label: 'Post Limit',
-        min: 1,
-        max: 100,
-        value: this.data.limit || RedditScraperNode.DEFAULT_LIMIT,
-        onChange: (value: number) => {
-          this.data.limit = Math.min(100, Math.max(1, value));
-          this.update();
+        value: this.data?.limit || RedditScraperNode.DEFAULT_LIMIT,
+        setValue: (value: any) => {
+          if (this.data) {
+            this.data.limit = Math.min(100, Math.max(1, Number(value) || 10));
+          }
         },
-      },
+      } as NodeControl,
       {
         type: 'select',
         key: 'time',
-        label: 'Time Range',
-        options: [
-          { value: 'hour', label: 'Past Hour' },
-          { value: 'day', label: 'Past 24 Hours' },
-          { value: 'week', label: 'Past Week' },
-          { value: 'month', label: 'Past Month' },
-          { value: 'year', label: 'Past Year' },
-          { value: 'all', label: 'All Time' },
-        ],
-        value: this.data.time || RedditScraperNode.DEFAULT_TIME,
-        onChange: (value: string) => {
-          this.data.time = value;
-          this.update();
+        value: this.data?.time || RedditScraperNode.DEFAULT_TIME,
+        setValue: (value: any) => {
+          if (this.data) {
+            this.data.time = String(value);
+          }
         },
-      },
+      } as NodeControl,
     ];
   }
 
-  private async fetchRedditPosts(
-    subreddit: string,
-    limit: number = 10,
-    time: string = 'day'
-  ): Promise<RedditPost[]> {
-    const url = `https://www.reddit.com/r/${subreddit}/top.json?limit=${limit}&t=${time}`;
-    
-    this.log(`Fetching top ${limit} posts from r/${subreddit} (time: ${time})`);
-    
+  private async fetchRedditPosts(subreddit: string, limit: number, time: string): Promise<{ posts: any[], count: number }> {
+    // Mock implementation for now
+    return {
+      posts: Array.from({ length: limit }, (_, i) => ({
+        title: `Mock Post ${i + 1} from r/${subreddit}`,
+        url: `#mock-post-${i + 1}`,
+        score: Math.floor(Math.random() * 1000),
+        author: `user${Math.floor(Math.random() * 1000)}`,
+        permalink: `#mock-post-${i + 1}`,
+        created_utc: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 86400),
+      })),
+      count: limit
+    };
+  }
+
+  async executeNode(inputs: Record<string, unknown>, context: NodeContext): Promise<{ success: boolean; output?: Record<string, unknown>; error?: string }> {
     try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Rete.js Reddit Scraper Node/1.0',
-        },
-      });
+      const { subreddit, limit, time } = this.data;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      this.log(`Fetching ${limit} posts from r/${subreddit} (${time} time range)`);
       
-      if (!data.data || !Array.isArray(data.data.children)) {
-        throw new Error('Invalid response format from Reddit API');
+      // Use mock data in demo mode
+      if (isMockMode()) {
+        this.log('⚠️ Using mock Reddit data - running in demo mode');
+        const { posts, count } = await this.fetchRedditPosts(subreddit, limit, time);
+        return { success: true, output: { posts, count } };
       }
-
-      return data.data.children.map((post: any) => ({
-        title: post.data.title,
-        url: `https://reddit.com${post.data.permalink}`,
-        score: post.data.score,
-        permalink: `https://reddit.com${post.data.permalink}`,
-        author: post.data.author,
-        created_utc: post.data.created_utc,
+      
+      // Real implementation
+      const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?limit=${limit}&t=${time}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json() as RedditApiResponse;
+      
+      const posts: RedditPost[] = data.data.children.map(({ data: post }) => ({
+        title: post.title,
+        url: `https://reddit.com${post.permalink}`,
+        score: post.score,
+        permalink: post.permalink,
+        author: post.author,
+        created_utc: post.created_utc,
+        selftext: post.selftext,
       }));
+
+      this.log(`Successfully fetched ${posts.length} posts`);
+      
+      return { 
+        success: true, 
+        output: { 
+          posts, 
+          count: posts.length 
+        } 
+      };
     } catch (error) {
-      this.log(`Error fetching Reddit posts: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.log(`Error: ${errorMessage}`);
       throw error;
     }
   }
 
-  protected async executeNode(): Promise<Record<string, any>> {
-    const subreddit = (this.data.subreddit || 'ai').trim().replace(/^r\//, '');
-    const limit = Math.min(100, Math.max(1, parseInt(this.data.limit) || RedditScraperNode.DEFAULT_LIMIT));
-    const time = this.data.time || RedditScraperNode.DEFAULT_TIME;
-
-    this.log(`Starting to fetch ${limit} posts from r/${subreddit}...`);
-    
-    const posts = await this.fetchRedditPosts(subreddit, limit, time);
-    
-    this.log(`Successfully fetched ${posts.length} posts from r/${subreddit}`);
-    
-    return {
-      posts,
-      count: posts.length,
-    };
+  onCreated() {
+    this.log('Reddit Scraper node created');
   }
 
-  async onCreated() {
-    super.onCreated();
-    this.log('Reddit Scraper Node created');
-  }
-
-  async onDestroy() {
-    this.log('Reddit Scraper Node destroyed');
-    super.onDestroy();
+  onDestroy() {
+    this.log('Reddit Scraper node destroyed');
   }
 }
