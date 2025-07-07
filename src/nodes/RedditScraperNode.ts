@@ -70,9 +70,10 @@ export class RedditScraperNode extends BaseNode<RedditScraperNodeData> {
         type: 'text',
         key: 'subreddit',
         value: this.data?.subreddit || 'ai',
-        setValue: (value: any) => {
+        setValue: (value: unknown) => {
           if (this.data) {
             this.data.subreddit = String(value);
+            this.update();
           }
         },
       } as NodeControl,
@@ -80,9 +81,10 @@ export class RedditScraperNode extends BaseNode<RedditScraperNodeData> {
         type: 'number',
         key: 'limit',
         value: this.data?.limit || RedditScraperNode.DEFAULT_LIMIT,
-        setValue: (value: any) => {
+        setValue: (value: unknown) => {
           if (this.data) {
             this.data.limit = Math.min(100, Math.max(1, Number(value) || 10));
+            this.update();
           }
         },
       } as NodeControl,
@@ -168,6 +170,7 @@ export class RedditScraperNode extends BaseNode<RedditScraperNodeData> {
   }
 
   onDestroy() {
+    super.onDestroy();
     this.log('Reddit Scraper node destroyed');
   }
 }

@@ -93,8 +93,8 @@ export class SummarizerNode extends BaseNode {
         label: 'Language',
         placeholder: 'e.g., english, spanish, french',
         value: this.language,
-        onChange: (value: string) => {
-          this.language = value.trim().toLowerCase();
+        onChange: (value: unknown) => {
+          this.language = (value as string).trim().toLowerCase();
           this.update();
         },
       },

@@ -56,15 +56,15 @@ async function initializeApp() {
     container.addEventListener('drop', async (e: DragEvent) => {
       e.preventDefault();
       const type = e.dataTransfer?.getData('application/node-type');
-      if (type) {
-        const rect = container.getBoundingClientRect();
-        const position = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top
-        };
-        const node = createNode(type, position);
-        await editor.addNode(node);
-      }
+        if (type) {
+          const rect = container.getBoundingClientRect();
+          const position = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+          };
+          const node = createNode(type, position, editor);
+          await editor.addNode(node);
+        }
     });
     
     // Allow drop

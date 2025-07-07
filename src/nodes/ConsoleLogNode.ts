@@ -40,8 +40,8 @@ export class ConsoleLogNode extends BaseNode {
         min: 1,
         max: 100,
         value: this.maxLogs,
-        onChange: (value: number) => {
-          this.maxLogs = Math.min(100, Math.max(1, value));
+        onChange: (value: unknown) => {
+          this.maxLogs = Math.min(100, Math.max(1, value as number));
           this.trimLogs();
           this.update();
         },

@@ -57,8 +57,8 @@ export class KeywordFilterNode extends BaseNode {
         key: 'caseSensitive',
         label: 'Case Sensitive',
         value: this.caseSensitive,
-        onChange: (value: boolean) => {
-          this.caseSensitive = value;
+        onChange: (value: unknown) => {
+          this.caseSensitive = value as boolean;
           this.update();
         },
       },

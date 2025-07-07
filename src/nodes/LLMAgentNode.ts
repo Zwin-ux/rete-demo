@@ -134,8 +134,8 @@ export class LLMAgentNode extends BaseNode {
         label: 'System Prompt',
         placeholder: 'You are a helpful assistant...',
         value: this.systemPrompt,
-        onChange: (value: string) => {
-          this.systemPrompt = value;
+        onChange: (value: unknown) => {
+          this.systemPrompt = value as string;
           this.initializeMessages();
           this.update();
         },

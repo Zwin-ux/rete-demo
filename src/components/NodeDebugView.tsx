@@ -1,13 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { Node, NodeEditor } from 'rete';
-import { NodeExecutionState } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { NodeExecutionResult } from '../types/node.types';
+import { NodeScheme } from '../core/BaseNode';
 import { updateNodeVisuals } from '../utils/nodeStyles';
 
 interface NodeDebugViewProps {
-  editor: NodeEditor | null;
-  selectedNode: Node | null;
-  nodeStates: Map<string, NodeExecutionState>;
-  onNodeSelect: (node: Node | null) => void;
+  editor: NodeEditor<NodeScheme> | null;
+  selectedNode: ClassicPreset.Node | null;
+  nodeStates: Map<string, NodeExecutionResult>;
+  onNodeSelect: (node: ClassicPreset.Node | null) => void;
 }
 
 const NodeDebugView: React.FC<NodeDebugViewProps> = ({
@@ -138,7 +139,7 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
         <div className="debug-panel bg-white border-t border-gray-200 shadow-lg">
           <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200">
             <h3 className="text-sm font-medium">
-              {selectedNode.data.name || 'Node'}
+              {selectedNode.label}
               <span className="ml-2 text-xs text-gray-500">
                 {selectedNode.id}
               </span>
@@ -157,7 +158,7 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <div className="text-xs text-gray-500 mb-1">Type</div>
-                <div className="text-sm">{selectedNode.data.type || 'N/A'}</div>
+                <div className="text-sm">{selectedNode.label || 'N/A'}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-500 mb-1">Status</div>
@@ -197,8 +198,8 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
               <div>
                 <h4 className="text-xs font-medium text-gray-500 mb-1">Outputs</h4>
                 <div className="bg-gray-50 p-2 rounded text-xs font-mono overflow-x-auto">
-                  {nodeStates.get(selectedNode.id)?.result?.output 
-                    ? JSON.stringify(nodeStates.get(selectedNode.id)?.result?.output, null, 2)
+                  {nodeStates.get(selectedNode.id)?.output 
+                    ? JSON.stringify(nodeStates.get(selectedNode.id)?.output, null, 2)
                     : 'No output yet'}
                 </div>
               </div>
@@ -206,8 +207,8 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
               <div>
                 <h4 className="text-xs font-medium text-gray-500 mb-1">Logs</h4>
                 <div className="bg-black text-green-400 p-2 rounded text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto">
-                  {nodeStates.get(selectedNode.id)?.result?.logs?.length ? (
-                    nodeStates.get(selectedNode.id)?.result?.logs.map((log, i) => (
+                  {nodeStates.get(selectedNode.id)?.logs?.length ? (
+                    nodeStates.get(selectedNode.id)?.logs.map((log: string, i: number) => (
                       <div key={i} className="border-b border-gray-800 py-1">
                         {log}
                       </div>

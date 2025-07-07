@@ -3,7 +3,7 @@ import { BaseNode } from '../core/BaseNode';
 import { NodeOutput } from '../types/node.types';
 
 export class StartNode extends BaseNode {
-  constructor(editor: NodeEditor) {
+  constructor(editor: NodeEditor<NodeScheme>) {
     super(editor, 'start', 'Start');
   }
 

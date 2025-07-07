@@ -133,8 +133,8 @@ export class DiscordWebhookNode extends BaseNode {
         label: 'Embed Color',
         value: this.embedColor,
         disabled: !this.useEmbed,
-        onChange: (value: string) => {
-          this.embedColor = value;
+        onChange: (value: unknown) => {
+          this.embedColor = value as string;
           this.update();
         },
       },

@@ -1,5 +1,5 @@
-import { Node } from 'rete';
-import { NodeExecutionState } from '../types/node.types';
+import { ClassicPreset } from 'rete';
+import { NodeExecutionResult } from '../types/node.types';
 
 export const NODE_STATUS_STYLES = {
   pending: {
@@ -47,54 +47,10 @@ export const getNodeStatusStyles = (node: Node, nodeStates: Map<string, NodeExec
   };
 };
 
-export const updateNodeVisuals = (
-  node: Node,
-  nodeStates: Map<string, NodeExecutionState>,
-  container: HTMLElement | null
-) => {
-  if (!container) return;
-  
-  const state = nodeStates.get(node.id);
-  const status = state?.status || 'pending';
-  const styles = NODE_STATUS_STYLES[status as keyof typeof NODE_STATUS_STYLES] || NODE_STATUS_STYLES.pending;
-  
-  // Update node container
-  const nodeElement = container.querySelector(`[data-node-id="${node.id}"]`);
-  if (nodeElement) {
-    // Remove all status classes
-    Object.values(NODE_STATUS_STYLES).forEach(style => {
-      nodeElement.classList.remove(
-        style.background,
-        style.border,
-        style.text
-      );
-    });
-    
-    // Add current status classes
-    nodeElement.classList.add(
-      styles.background,
-      styles.border,
-      'border-2',
-      'transition-all',
-      'duration-300'
-    );
-    
-    // Add status indicator
-    let statusIndicator = nodeElement.querySelector('.node-status-indicator');
-    if (!statusIndicator) {
-      statusIndicator = document.createElement('div');
-      statusIndicator.className = 'node-status-indicator absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold';
-      nodeElement.appendChild(statusIndicator);
-    }
-    
-    // Update status indicator
-    statusIndicator.textContent = styles.icon;
-    statusIndicator.className = `node-status-indicator absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${styles.background} ${styles.border} border-2`;
-    
-    // Add tooltip for execution time
-    if (state?.startTime && state?.endTime) {
-      const duration = state.endTime - state.startTime;
-      statusIndicator.title = `Execution time: ${duration}ms`;
-    }
+export function updateNodeVisuals(node: ClassicPreset.Node, nodeStates: Map<string, NodeExecutionResult>, element?: HTMLElement) {
+  const status = nodeStates.get(node.id)?.status || 'pending';
+
+  if (element) {
+    element.dataset.status = status;
   }
-};
+}

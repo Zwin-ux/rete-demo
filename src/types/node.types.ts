@@ -14,7 +14,8 @@ export type NodeValueType =
   | 'object' 
   | 'array' 
   | 'any'
-  | 'RedditPost[]';
+  | 'RedditPost[]'
+  | 'event';
 
 export interface NodeInput {
   name: string;
@@ -37,19 +38,28 @@ export type ControlType =
   | 'select' 
   | 'checkbox' 
   | 'slider' 
-  | 'code';
+  | 'code'
+  | 'toggle'
+  | 'password'
+  | 'textarea'
+  | 'color'
+  | 'button';
 
 export interface NodeControl<T = unknown> {
   type: ControlType;
   key: string;
   label?: string;
-  value: T;
+  value?: T; // Made optional as some controls like buttons don't have a value
   options?: { label: string; value: T }[];
   min?: number;
   max?: number;
   step?: number;
   description?: string;
-  setValue: (value: T) => void;
+  placeholder?: string; // Added placeholder
+  onChange?: (value: T) => void; // Added onChange
+  onClick?: () => void; // Added onClick for button type
+  disabled?: boolean; // Added disabled property
+  setValue?: (value: T) => void; // Made optional
 }
 
 // Result of executing a node
@@ -59,6 +69,11 @@ export interface NodeExecutionResult {
   error?: string;
   logs?: string[];
   executionTime?: number;
+  status?: 'pending' | 'running' | 'success' | 'error' | 'skipped';
+  inputs?: Record<string, unknown>;
+  outputs?: Record<string, unknown>;
+  startTime?: number;
+  endTime?: number;
 }
 
 // Context available to nodes during execution

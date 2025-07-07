@@ -1,29 +1,20 @@
-import { Node, NodeEditor } from 'rete';
+import { ClassicPreset, NodeEditor } from 'rete';
 import { NodeExecutionResult } from '../types/node.types';
-
-type NodeStatus = 'pending' | 'running' | 'success' | 'error' | 'skipped';
-
-interface NodeExecutionState {
-  node: Node;
-  status: NodeStatus;
-  startTime?: number;
-  endTime?: number;
-  result?: NodeExecutionResult;
-  error?: Error;
-}
+import { NodeScheme } from './BaseNode';
+import { NodeMemory } from './memory';
 
 export class FlowRunner {
-  private editor: NodeEditor;
-  private executionStates: Map<string, NodeExecutionState> = new Map();
+  private editor: NodeEditor<NodeScheme>;
+  private executionStates: Map<string, NodeExecutionResult> = new Map();
   private executionOrder: string[] = [];
   private isRunning: boolean = false;
-  private onNodeStateChange: (nodeId: string, state: NodeExecutionState) => void;
+  private onNodeStateChange: (nodeId: string, state: NodeExecutionResult) => void;
   private onExecutionComplete: () => void;
 
   constructor(
-    editor: NodeEditor,
+    editor: NodeEditor<NodeScheme>,
     callbacks: {
-      onNodeStateChange: (nodeId: string, state: NodeExecutionState) => void;
+      onNodeStateChange: (nodeId: string, state: NodeExecutionResult) => void;
       onExecutionComplete: () => void;
     }
   ) {
@@ -39,13 +30,16 @@ export class FlowRunner {
     // Initialize states for all nodes
     this.editor.getNodes().forEach(node => {
       this.executionStates.set(node.id, {
-        node,
+        success: false,
         status: 'pending',
+        inputs: {},
+        outputs: {},
+        logs: [],
       });
     });
   }
 
-  private updateNodeState(nodeId: string, updates: Partial<NodeExecutionState>) {
+  private updateNodeState(nodeId: string, updates: Partial<NodeExecutionResult>) {
     const state = this.executionStates.get(nodeId);
     if (!state) return;
 
@@ -54,7 +48,7 @@ export class FlowRunner {
     this.onNodeStateChange(nodeId, newState);
   }
 
-  private async getNodeInputs(node: Node): Promise<Record<string, any>> {
+  private async getNodeInputs(node: ClassicPreset.Node): Promise<Record<string, any>> {
     const inputs: Record<string, any> = {};
     const connections = this.editor.getConnections()
       .filter(conn => conn.target === node.id);
@@ -67,7 +61,7 @@ export class FlowRunner {
         continue;
       }
 
-      const outputValue = sourceState.result?.output?.[conn.sourceOutput];
+      const outputValue = sourceState.output?.[conn.sourceOutput];
       if (outputValue !== undefined) {
         inputs[conn.targetInput] = outputValue;
       }
@@ -76,17 +70,7 @@ export class FlowRunner {
     return inputs;
   }
 
-  private async executeNode(node: Node): Promise<NodeExecutionState> {
-    const nodeState = this.executionStates.get(node.id) || {
-      node,
-      status: 'pending' as NodeStatus,
-    };
-
-    // Skip if already executed or has no run method
-    if (nodeState.status !== 'pending' || typeof (node as any).run !== 'function') {
-      return { ...nodeState, status: 'skipped' as NodeStatus };
-    }
-
+  private async executeNode(node: ClassicPreset.Node): Promise<NodeExecutionResult> {
     // Update state to running
     this.updateNodeState(node.id, {
       status: 'running',
@@ -105,23 +89,28 @@ export class FlowRunner {
       this.updateNodeState(node.id, {
         status: 'success',
         endTime,
-        result,
+        output: result.output,
+        logs: result.logs,
+        success: true,
+        inputs,
       });
       
-      return { node, status: 'success', result, endTime };
+      return { ...result, status: 'success', inputs, endTime };
     } catch (error) {
       // Update state with error
       const endTime = Date.now();
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.updateNodeState(node.id, {
         status: 'error',
         endTime,
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: errorMessage,
+        success: false,
       });
       
       return { 
-        node, 
+        success: false, 
         status: 'error', 
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: errorMessage,
         endTime,
       };
     }
@@ -205,7 +194,7 @@ export class FlowRunner {
     this.isRunning = false;
   }
 
-  public getNodeState(nodeId: string): NodeExecutionState | undefined {
+  public getNodeState(nodeId: string): NodeExecutionResult | undefined {
     return this.executionStates.get(nodeId);
   }
 

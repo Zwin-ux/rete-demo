@@ -1,22 +1,22 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Node } from 'rete';
-import { NodeExecutionState } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { NodeExecutionResult } from '../types/node.types';
 
 interface NodeDebugContextType {
-  selectedNode: Node | null;
-  nodeStates: Map<string, NodeExecutionState>;
-  selectNode: (node: Node | null) => void;
-  updateNodeState: (nodeId: string, state: NodeExecutionState) => void;
+  selectedNode: ClassicPreset.Node | null;
+  nodeStates: Map<string, NodeExecutionResult>;
+  selectNode: (node: ClassicPreset.Node | null) => void;
+  updateNodeState: (nodeId: string, state: NodeExecutionResult) => void;
   clearNodeStates: () => void;
 }
 
 const NodeDebugContext = createContext<NodeDebugContextType | undefined>(undefined);
 
 export const NodeDebugProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [nodeStates, setNodeStates] = useState<Map<string, NodeExecutionState>>(new Map());
+  const [selectedNode, setSelectedNode] = useState<ClassicPreset.Node | null>(null);
+  const [nodeStates, setNodeStates] = useState<Map<string, NodeExecutionResult>>(new Map());
 
-  const updateNodeState = useCallback((nodeId: string, state: NodeExecutionState) => {
+  const updateNodeState = useCallback((nodeId: string, state: NodeExecutionResult) => {
     setNodeStates(prev => {
       const newStates = new Map(prev);
       newStates.set(nodeId, state);
@@ -28,7 +28,7 @@ export const NodeDebugProvider: React.FC<{ children: ReactNode }> = ({ children 
     setNodeStates(new Map());
   }, []);
 
-  const selectNode = useCallback((node: Node | null) => {
+  const selectNode = useCallback((node: ClassicPreset.Node | null) => {
     setSelectedNode(node);
   }, []);
 

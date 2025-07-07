@@ -1,6 +1,6 @@
 import React, { useState, useEffect, ReactNode } from 'react';
-import type { Node as ReteNode } from 'rete';
-import { NodeExecutionState, NodeExecutionResult } from '../types/node.types';
+import { ClassicPreset } from 'rete';
+import { NodeExecutionResult } from '../types/node.types';
 
 // Define a local type for the node
 type NodeType = {
@@ -13,7 +13,7 @@ type NodeType = {
 
 interface NodeDebugPanelProps {
   node: NodeType | null;
-  executionState: NodeExecutionState | null;
+  executionState: NodeExecutionResult | null;
   onClose: () => void;
 }
 
@@ -43,7 +43,7 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
   };
 
   const renderLogs = () => {
-    const logs = executionState?.result?.logs;
+    const logs = executionState?.logs;
     
     return (
       <div className="space-y-1 text-xs font-mono">
@@ -64,7 +64,7 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
               try {
                 logContent = JSON.stringify(log, null, 2);
               } catch (e) {
-                logContent = '[Object]';
+                logContent = '[Unserializable value]';
               }
             } else {
               logContent = String(log);
@@ -84,7 +84,7 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
   };
 
   const renderInputs = () => {
-    const inputs = executionState?.result?.inputs;
+    const inputs = executionState?.inputs;
     
     if (!inputs || typeof inputs !== 'object') {
       return <div className="text-gray-400 italic">No input data available</div>;
@@ -123,7 +123,7 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
   };
 
   const renderOutputs = () => {
-    const outputs = executionState?.result?.outputs || executionState?.result?.output;
+    const outputs = executionState?.outputs || executionState?.output;
     
     if (!outputs || typeof outputs !== 'object') {
       return <div className="text-gray-400 italic">No output data available</div>;
@@ -188,9 +188,9 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
           <div>
             <div className="text-xs text-gray-500">Error</div>
             <div className="text-red-600 text-sm break-words">
-              {executionState.error instanceof Error 
-                ? executionState.error.message 
-                : String(executionState.error)}
+              {typeof executionState.error === 'string' 
+                ? executionState.error 
+                : JSON.stringify(executionState.error)}
             </div>
           </div>
         )}
@@ -206,9 +206,7 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
   };
 
   // Safely get the node name from node data
-  const nodeName = node?.data && typeof node.data === 'object' && 'name' in node.data
-    ? String(node.data.name)
-    : 'Node';
+  const nodeName = node?.label || (node?.data?.name as string) || 'Node';
 
   return (
     <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">

@@ -80,8 +80,8 @@ export class MemoryWriteNode extends BaseNode {
         min: 0,
         step: 1,
         value: this.ttl,
-        onChange: (value: number) => {
-          this.ttl = Math.max(0, value);
+        onChange: (value: unknown) => {
+          this.ttl = Math.max(0, value as number);
           this.update();
         },
       },

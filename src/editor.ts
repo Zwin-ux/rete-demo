@@ -5,84 +5,55 @@ import { AutoArrangePlugin } from 'rete-auto-arrange-plugin';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 
+// Import all custom nodes
+import { ConsoleLogNode } from './nodes/ConsoleLogNode';
+import { DiscordWebhookNode } from './nodes/DiscordWebhookNode';
+import { KeywordFilterNode } from './nodes/KeywordFilterNode';
+import { LLMAgentNode } from './nodes/LLMAgentNode';
+import { MemoryReadNode } from './nodes/MemoryReadNode';
+import { MemoryWriteNode } from './nodes/MemoryWriteNode';
+import { RedditScraperNode } from './nodes/RedditScraperNode';
+import { StartNode } from './nodes/StartNode';
+import { SummarizerNode } from './nodes/SummarizerNode';
+
 // Types
 type Position = { x: number; y: number };
-type NodeTypes = 'trigger' | 'http' | 'condition' | 'log';
+type NodeTypes = 'trigger' | 'http' | 'condition' | 'log' | 'console-log' | 'discord-webhook' | 'keyword-filter' | 'llm-agent' | 'memory-read' | 'memory-write' | 'reddit-scraper' | 'start' | 'summarizer';
 
 // Socket for connections
 const socket = new ClassicPreset.Socket('socket');
 
-// Custom node class that extends ClassicPreset.Node
-class CustomNode extends ClassicPreset.Node {
-  width = 180;
-  height = 100;
-  position: [number, number] = [0, 0];
-  
-  constructor(label: string) {
-    super(label);
-  }
-  
-  addInputControl(key: string, label: string) {
-    const input = new ClassicPreset.Input(socket, label);
-    this.addInput(key, input);
-    return input;
-  }
-  
-  addOutputControl(key: string, label: string) {
-    const output = new ClassicPreset.Output(socket, label);
-    this.addOutput(key, output);
-    return output;
-  }
-}
-
-// Node types
-class TriggerNode extends CustomNode {
-    constructor() {
-        super('Trigger');
-        this.addOutputControl('output', 'Output');
-    }
-}
-
-class HttpNode extends CustomNode {
-    constructor() {
-        super('HTTP Request');
-        this.addInputControl('input', 'Input');
-        this.addOutputControl('output', 'Output');
-    }
-}
-
-class ConditionNode extends CustomNode {
-    constructor() {
-        super('Condition');
-        this.addInputControl('input', 'Input');
-        this.addOutputControl('true', 'True');
-        this.addOutputControl('false', 'False');
-    }
-}
-
-class LogNode extends CustomNode {
-    constructor() {
-        super('Log');
-        this.addInputControl('input', 'Input');
-    }
-}
-
 // Node factory
-export const createNode = (type: string, position: { x: number; y: number }) => {
+export const createNode = (type: string, position: { x: number; y: number }, editor: NodeEditor) => {
     let node;
     
     switch (type) {
-        case 'trigger':
-            node = new TriggerNode();
+        case 'start':
+            node = new StartNode(editor);
             break;
-        case 'http':
-            node = new HttpNode();
+        case 'reddit-scraper':
+            node = new RedditScraperNode(editor);
             break;
-        case 'condition':
-            node = new ConditionNode();
+        case 'keyword-filter':
+            node = new KeywordFilterNode(editor);
             break;
-        case 'log':
-            node = new LogNode();
+        case 'summarizer':
+            node = new SummarizerNode(editor);
+            break;
+        case 'llm-agent':
+            node = new LLMAgentNode(editor);
+            break;
+        case 'console-log':
+            node = new ConsoleLogNode(editor);
+            break;
+        case 'discord-webhook':
+            node = new DiscordWebhookNode(editor);
+            break;
+        case 'memory-read':
+            node = new MemoryReadNode(editor);
+            break;
+        case 'memory-write':
+            node = new MemoryWriteNode(editor);
             break;
         default:
             throw new Error(`Unknown node type: ${type}`);
@@ -120,9 +91,6 @@ export async function initEditor(container: HTMLElement) {
     accumulating: AreaExtensions.accumulateOnCtrl()
   });
   
-  // Enable zoom controls
-  AreaExtensions.zoomAt(area, editor.getNodes());
-  
   // Enable area selection
   AreaExtensions.selectableArea(area);
   
@@ -130,15 +98,25 @@ export async function initEditor(container: HTMLElement) {
   AreaExtensions.snapGrid(area, { size: 10, dynamic: true });
 
     // Add default nodes
-    const trigger = createNode('trigger', { x: 100, y: 100 });
-    const http = createNode('http', { x: 400, y: 100 });
-    const condition = createNode('condition', { x: 400, y: 250 });
-    const log = createNode('log', { x: 700, y: 100 });
+    const startNode = createNode('start', { x: 100, y: 100 }, editor);
+    const redditScraperNode = createNode('reddit-scraper', { x: 400, y: 100 }, editor);
+    const keywordFilterNode = createNode('keyword-filter', { x: 700, y: 100 }, editor);
+    const summarizerNode = createNode('summarizer', { x: 1000, y: 100 }, editor);
+    const llmAgentNode = createNode('llm-agent', { x: 1300, y: 100 }, editor);
+    const consoleLogNode = createNode('console-log', { x: 1600, y: 100 }, editor);
+    const discordWebhookNode = createNode('discord-webhook', { x: 1900, y: 100 }, editor);
+    const memoryReadNode = createNode('memory-read', { x: 2200, y: 100 }, editor);
+    const memoryWriteNode = createNode('memory-write', { x: 2500, y: 100 }, editor);
 
-    await editor.addNode(trigger);
-    await editor.addNode(http);
-    await editor.addNode(condition);
-    await editor.addNode(log);
+    await editor.addNode(startNode);
+    await editor.addNode(redditScraperNode);
+    await editor.addNode(keywordFilterNode);
+    await editor.addNode(summarizerNode);
+    await editor.addNode(llmAgentNode);
+    await editor.addNode(consoleLogNode);
+    await editor.addNode(discordWebhookNode);
+    await editor.addNode(memoryReadNode);
+    await editor.addNode(memoryWriteNode);
 
     try {
         // Auto arrange nodes if available
@@ -147,9 +125,7 @@ export async function initEditor(container: HTMLElement) {
         }
 
         // Enable zoom and pan if available
-        if ('zoom' in area) {
-            (area as any).zoom(0.8);
-        }
+        AreaExtensions.zoomAt(area, editor.getNodes());
     } catch (error) {
         console.warn('Error during editor initialization:', error);
     }
@@ -160,10 +136,15 @@ export async function initEditor(container: HTMLElement) {
 // Initialize node palette
 export function initNodePalette(container: HTMLElement, onDragStart: (type: string) => void) {
     const nodeTypes = [
-        { type: 'trigger', label: 'Trigger' },
-        { type: 'http', label: 'HTTP Request' },
-        { type: 'condition', label: 'Condition' },
-        { type: 'log', label: 'Log' }
+        { type: 'start', label: 'Start' },
+        { type: 'reddit-scraper', label: 'Reddit Scraper' },
+        { type: 'keyword-filter', label: 'Keyword Filter' },
+        { type: 'summarizer', label: 'Summarizer' },
+        { type: 'llm-agent', label: 'LLM Agent' },
+        { type: 'console-log', label: 'Console Log' },
+        { type: 'discord-webhook', label: 'Discord Webhook' },
+        { type: 'memory-read', label: 'Memory Read' },
+        { type: 'memory-write', label: 'Memory Write' }
     ];
 
     nodeTypes.forEach(nodeType => {
@@ -202,10 +183,7 @@ export function handleNodeDrop(container: HTMLElement, onDrop: (type: string, po
         }
     });
     
-    AreaExtensions.snapGrid(area, { size: 20 });
-    AreaExtensions.zoomAt(area, editor.getNodes());
-
-    return { editor, area, render };
+    return { editor, area };
 }
 
 // Helper function to create React root
@@ -218,7 +196,6 @@ function createRoot(component: React.ReactNode) {
 
 // Export types for other modules
 export type { Position, NodeTypes };
-export { CustomNode, TriggerNode, HttpNode, ConditionNode, LogNode };
 
 // Export editor instance types
 export type { NodeEditor, AreaPlugin, ConnectionPlugin, AutoArrangePlugin };

@@ -73,8 +73,8 @@ export class MemoryReadNode extends BaseNode {
         placeholder: 'Enter default value',
         value: this.defaultValue,
         disabled: !this.useDefault,
-        onChange: (value: string) => {
-          this.defaultValue = value;
+        onChange: (value: unknown) => {
+          this.defaultValue = value as string;
           this.update();
         },
       },
