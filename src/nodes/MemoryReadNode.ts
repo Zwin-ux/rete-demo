@@ -1,136 +1,76 @@
-import { NodeEditor } from 'rete';
-import { BaseNode } from '../core/BaseNode';
-import { NodeInput, NodeOutput, NodeControl } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
+import { BaseNode, NodeScheme } from '../core/BaseNode';
+import { NodeContext } from '../types/node.types';
 
-export class MemoryReadNode extends BaseNode {
-  private memoryKey: string = '';
-  private defaultValue: string = '';
-  private useDefault: boolean = false;
+type NodeData = {
+  memoryKey: string;
+  defaultValue: any;
+  useDefault: boolean;
+};
 
-  constructor(editor: NodeEditor) {
-    super(editor, 'memory-read', 'Read Memory');
+const socket = new ClassicPreset.Socket('socket');
+
+export class MemoryReadNode extends BaseNode<NodeData> {
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
+    super(editor, area, 'memory-read', 'Read Memory', {
+      memoryKey: '',
+      defaultValue: '',
+      useDefault: false,
+    });
+
+    this.addInput('key', new ClassicPreset.Input(socket, 'Key'));
+    this.addInput('default', new ClassicPreset.Input(socket, 'Default'));
+
+    this.addOutput('value', new ClassicPreset.Output(socket, 'Value'));
+    this.addOutput('exists', new ClassicPreset.Output(socket, 'Exists'));
+
+    this.addControl('memoryKey', new ClassicPreset.InputControl('text', {
+      initial: this.data.memoryKey, change: (value) => { this.data.memoryKey = value; this.update(); }
+    }));
+    this.addControl('defaultValue', new ClassicPreset.InputControl('text', {
+      initial: this.data.defaultValue, change: (value) => { this.data.defaultValue = value; this.update(); }
+    }));
+    this.addControl('useDefault', new ClassicPreset.InputControl('text', { // TODO: change to checkbox
+      initial: this.data.useDefault ? 'true' : 'false', 
+      change: (value) => { this.data.useDefault = value === 'true'; this.update(); }
+    }));
   }
 
-  getInputs(): NodeInput[] {
-    return [
-      { 
-        name: 'key', 
-        type: 'string', 
-        description: 'Memory key to read from',
-        required: false
-      },
-      { 
-        name: 'default', 
-        type: 'any', 
-        description: 'Default value if key not found',
-        required: false
-      },
-    ];
-  }
-
-  getOutputs(): NodeOutput[] {
-    return [
-      { 
-        name: 'value', 
-        type: 'any', 
-        description: 'Value read from memory' 
-      },
-      { 
-        name: 'exists', 
-        type: 'boolean', 
-        description: 'Whether the key existed in memory' 
-      },
-    ];
-  }
-
-  getControls(): NodeControl[] {
-    return [
-      {
-        type: 'text',
-        key: 'memoryKey',
-        label: 'Memory Key',
-        placeholder: 'Enter memory key',
-        value: this.memoryKey,
-        onChange: (value: string) => {
-          this.memoryKey = value.trim();
-          this.update();
-        },
-      },
-      {
-        type: 'toggle',
-        key: 'useDefault',
-        label: 'Use Default Value',
-        value: this.useDefault,
-        onChange: (value: boolean) => {
-          this.useDefault = value;
-          this.update();
-        },
-      },
-      {
-        type: 'text',
-        key: 'defaultValue',
-        label: 'Default Value',
-        placeholder: 'Enter default value',
-        value: this.defaultValue,
-        disabled: !this.useDefault,
-        onChange: (value: unknown) => {
-          this.defaultValue = value as string;
-          this.update();
-        },
-      },
-    ];
-  }
-
-  protected async executeNode(
-    inputs: Record<string, any>,
-    context: any
-  ): Promise<Record<string, any>> {
-    const key = inputs.key || this.memoryKey;
+  async executeNode(
+    inputs: { key?: string[], default?: any[] },
+    context: NodeContext
+  ): Promise<{ value: any, exists: boolean }> {
+    const key = inputs.key?.[0] || this.data.memoryKey;
     
     if (!key) {
-      throw new Error('Memory key is required');
+      this.warn('Memory key is required');
+      return { value: null, exists: false };
     }
 
-    this.log(`Reading from memory: ${key}`);
+    this.info(`Reading from memory: ${key}`);
     
     try {
       const value = await this.memory.get(key);
-      const exists = value !== null;
+      const exists = value !== null && value !== undefined;
       
-      if (!exists && this.useDefault) {
-        this.log(`Key not found, using default value`);
-        return {
-          value: inputs.default !== undefined ? inputs.default : this.defaultValue,
-          exists: false,
-        };
+      if (!exists && this.data.useDefault) {
+        this.info(`Key not found, using default value`);
+        const defaultValue = inputs.default?.[0] !== undefined ? inputs.default[0] : this.data.defaultValue;
+        return { value: defaultValue, exists: false };
       }
       
       if (!exists) {
-        this.log(`Key not found in memory`);
-        return {
-          value: null,
-          exists: false,
-        };
+        this.info(`Key not found in memory`);
+        return { value: null, exists: false };
       }
       
-      this.log(`Successfully read value from memory`);
-      return {
-        value,
-        exists: true,
-      };
+      this.info(`Successfully read value from memory`);
+      return { value, exists: true };
     } catch (error) {
-      this.log(`Error reading from memory: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.error(`Error reading from memory: ${errorMessage}`);
       throw error;
     }
-  }
-
-  async onCreated() {
-    super.onCreated();
-    this.log('Memory Read Node created');
-  }
-
-  async onDestroy() {
-    this.log('Memory Read Node destroyed');
-    super.onDestroy();
   }
 }

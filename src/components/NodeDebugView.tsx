@@ -1,11 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
 import { NodeExecutionResult } from '../types/node.types';
 import { NodeScheme } from '../core/BaseNode';
 import { updateNodeVisuals } from '../utils/nodeStyles';
 
+// Define NodeView interface to include the el property
+interface NodeView {
+  el?: HTMLElement;
+  [key: string]: any;
+}
+
 interface NodeDebugViewProps {
   editor: NodeEditor<NodeScheme> | null;
+  area: AreaPlugin<any, any>;
   selectedNode: ClassicPreset.Node | null;
   nodeStates: Map<string, NodeExecutionResult>;
   onNodeSelect: (node: ClassicPreset.Node | null) => void;
@@ -13,6 +21,7 @@ interface NodeDebugViewProps {
 
 const NodeDebugView: React.FC<NodeDebugViewProps> = ({
   editor,
+  area,
   selectedNode,
   nodeStates,
   onNodeSelect,
@@ -22,18 +31,23 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
 
   // Update node visuals when node states change
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !area) return;
 
     const nodes = editor.getNodes();
     nodes.forEach(node => {
-      const nodeView = editor.view.nodes.get(node);
-      updateNodeVisuals(node, nodeStates, nodeView?.el);
+      const nodeView = area.nodeViews.get(node.id) as NodeView;
+      if (nodeView) {
+        const state = nodeStates.get((node as any).id);
+        if (state) {
+          updateNodeVisuals(nodeView, state);
+        }
+      }
     });
-  }, [editor, nodeStates]);
+  }, [editor, area, nodeStates]);
 
   // Handle node selection
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !area) return;
 
     const handleNodeClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -61,20 +75,23 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
     clickHandlerRef.current = handleNodeClick;
     
     // Add click event listener to the editor container
-    const editorContainer = editor.view.container;
-    editorContainer.addEventListener('click', handleNodeClick);
+    const editorContainer = area.container;
+    if (editorContainer) {
+      editorContainer.addEventListener('click', handleNodeClick);
 
-    // Cleanup
-    return () => {
-      if (clickHandlerRef.current) {
-        editorContainer.removeEventListener('click', clickHandlerRef.current);
-      }
-    };
-  }, [editor, onNodeSelect]);
+      // Cleanup
+      return () => {
+        if (clickHandlerRef.current && editorContainer) {
+          editorContainer.removeEventListener('click', clickHandlerRef.current);
+        }
+      };
+    }
+    return undefined;
+  }, [editor, area, onNodeSelect]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !area) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       // Close debug panel on Escape key
@@ -110,8 +127,8 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
           onNodeSelect(nodes[nextIndex]);
           
           // Scroll the node into view
-          const nodeView = editor.view.nodes.get(nodes[nextIndex]);
-          if (nodeView) {
+          const nodeView = area.nodeViews.get(nodes[nextIndex].id) as NodeView;
+          if (nodeView && nodeView.el) {
             nodeView.el.scrollIntoView({ 
               behavior: 'smooth', 
               block: 'center',
@@ -128,7 +145,8 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
     };
   }, [editor, selectedNode, onNodeSelect]);
 
-  if (!editor) return null;
+  // Render the debug panel if a node is selected
+  if (!selectedNode || !editor) return null;
 
   return (
     <div 
@@ -147,6 +165,8 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
             <button
               className="text-gray-500 hover:text-gray-700"
               onClick={() => onNodeSelect(null)}
+              aria-label="Close debug panel"
+              title="Close"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -163,43 +183,47 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
               <div>
                 <div className="text-xs text-gray-500 mb-1">Status</div>
                 <div className="text-sm">
-                  {nodeStates.get(selectedNode.id)?.status || 'pending'}
+                  {nodeStates.get(selectedNode.id ?? '')?.status || 'pending'}
                 </div>
               </div>
-              {nodeStates.get(selectedNode.id)?.startTime && (
+              {nodeStates.get(selectedNode.id ?? '')?.startTime && (
                 <div>
                   <div className="text-xs text-gray-500 mb-1">Duration</div>
                   <div className="text-sm">
-                    {nodeStates.get(selectedNode.id)?.endTime
-                      ? `${nodeStates.get(selectedNode.id)!.endTime! - nodeStates.get(selectedNode.id)!.startTime!}ms`
-                      : 'Running...'}
+                    {(() => {
+                      const state = nodeStates.get(selectedNode.id ?? '');
+                      if (state?.endTime && state?.startTime) {
+                        return `${state.endTime - state.startTime}ms`;
+                      }
+                      return 'Running...';
+                    })()}
                   </div>
                 </div>
               )}
             </div>
             
-            {nodeStates.get(selectedNode.id)?.error && (
+            {nodeStates.get(selectedNode.id ?? '')?.error && (
               <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
                 <div className="font-medium">Error:</div>
                 <div className="whitespace-pre-wrap break-words">
-                  {nodeStates.get(selectedNode.id)?.error?.message || 'Unknown error'}
+                  {nodeStates.get(selectedNode.id ?? '')?.error || 'Unknown error'}
                 </div>
               </div>
             )}
             
             <div className="space-y-4">
               <div>
-                <h4 className="text-xs font-medium text-gray-500 mb-1">Inputs</h4>
+                <h4 className="text-xs font-medium text-gray-500 mb-1">Data</h4>
                 <div className="bg-gray-50 p-2 rounded text-xs font-mono overflow-x-auto">
-                  {JSON.stringify(selectedNode.data.inputs || {}, null, 2)}
+                  {JSON.stringify((selectedNode as any)?.data || {}, null, 2)}
                 </div>
               </div>
               
               <div>
                 <h4 className="text-xs font-medium text-gray-500 mb-1">Outputs</h4>
                 <div className="bg-gray-50 p-2 rounded text-xs font-mono overflow-x-auto">
-                  {nodeStates.get(selectedNode.id)?.output 
-                    ? JSON.stringify(nodeStates.get(selectedNode.id)?.output, null, 2)
+                  {nodeStates.get(selectedNode.id ?? '')?.output 
+                    ? JSON.stringify(nodeStates.get(selectedNode.id ?? '')?.output || {}, null, 2)
                     : 'No output yet'}
                 </div>
               </div>
@@ -207,15 +231,20 @@ const NodeDebugView: React.FC<NodeDebugViewProps> = ({
               <div>
                 <h4 className="text-xs font-medium text-gray-500 mb-1">Logs</h4>
                 <div className="bg-black text-green-400 p-2 rounded text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto">
-                  {nodeStates.get(selectedNode.id)?.logs?.length ? (
-                    nodeStates.get(selectedNode.id)?.logs.map((log: string, i: number) => (
-                      <div key={i} className="border-b border-gray-800 py-1">
-                        {log}
-                      </div>
-                    ))
-                  ) : (
-                    'No logs available'
-                  )}
+                  {(() => {
+                    const state = nodeStates.get(selectedNode.id ?? '');
+                    if (state?.logs?.length) {
+                      return state.logs.map((log: any, i: number) => (
+                        <div key={i} className="border-b border-gray-800 py-1">
+                          <p className={`${log.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+                            {log.message || String(log)}
+                          </p>
+                        </div>
+                      ));
+                    }
+                    return <>No logs available</>;
+                  })()}
+
                 </div>
               </div>
             </div>

@@ -1,6 +1,7 @@
-import { NodeEditor } from 'rete';
-import { BaseNode } from '../core/BaseNode';
-import { NodeInput, NodeOutput, NodeControl } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
+import { BaseNode, NodeScheme } from '../core/BaseNode';
+import { NodeContext } from '../types/node.types';
 
 interface DiscordWebhookPayload {
   content?: string;
@@ -25,138 +26,57 @@ interface DiscordWebhookPayload {
   };
 }
 
-export class DiscordWebhookNode extends BaseNode {
-  private webhookUrl: string = '';
-  private username: string = 'Rete Bot';
-  private avatarUrl: string = '';
-  private useEmbed: boolean = true;
-  private embedColor: string = '#5865F2';
-  private testMessage: string = 'Test message from Rete.js Discord Webhook Node';
+type NodeData = {
+  webhookUrl: string;
+  username: string;
+  avatarUrl: string;
+  useEmbed: boolean;
+  embedColor: string;
+  message: string;
+  title: string;
+  url: string;
+}
+
+const socket = new ClassicPreset.Socket('socket');
+
+export class DiscordWebhookNode extends BaseNode<NodeData> {
   private lastStatus: { success: boolean; message: string; timestamp: number } | null = null;
 
-  constructor(editor: NodeEditor) {
-    super(editor, 'discord-webhook', 'Discord Webhook');
-  }
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
+    super(editor, area, 'discord-webhook', 'Discord Webhook', {
+      webhookUrl: '',
+      username: 'Rete Bot',
+      avatarUrl: '',
+      useEmbed: true,
+      embedColor: '#5865F2',
+      message: '',
+      title: '',
+      url: ''
+    });
 
-  getInputs(): NodeInput[] {
-    return [
-      { 
-        name: 'message', 
-        type: 'string', 
-        description: 'Message content to send',
-        required: false
-      },
-      { 
-        name: 'title', 
-        type: 'string', 
-        description: 'Title for the embed',
-        required: false
-      },
-      { 
-        name: 'url', 
-        type: 'string', 
-        description: 'URL to include in the embed',
-        required: false
-      },
-      { 
-        name: 'trigger', 
-        type: 'event', 
-        description: 'Trigger to send the message',
-        required: false
-      },
-    ];
-  }
+    this.addInput('message', new ClassicPreset.Input(socket, 'Message'));
+    this.addInput('title', new ClassicPreset.Input(socket, 'Title'));
+    this.addInput('url', new ClassicPreset.Input(socket, 'URL'));
 
-  getOutputs(): NodeOutput[] {
-    return [
-      { 
-        name: 'success', 
-        type: 'boolean', 
-        description: 'Whether the message was sent successfully' 
-      },
-      { 
-        name: 'response', 
-        type: 'object', 
-        description: 'Raw response from Discord API' 
-      },
-    ];
-  }
+    this.addOutput('success', new ClassicPreset.Output(socket, 'Success'));
+    this.addOutput('response', new ClassicPreset.Output(socket, 'Response'));
 
-  getControls(): NodeControl[] {
-    return [
-      {
-        type: 'text',
-        key: 'webhookUrl',
-        label: 'Webhook URL',
-        placeholder: 'https://discord.com/api/webhooks/...',
-        value: this.webhookUrl,
-        onChange: (value: string) => {
-          this.webhookUrl = value.trim();
-          this.update();
-        },
-      },
-      {
-        type: 'text',
-        key: 'username',
-        label: 'Username',
-        placeholder: 'Webhook username',
-        value: this.username,
-        onChange: (value: string) => {
-          this.username = value;
-          this.update();
-        },
-      },
-      {
-        type: 'text',
-        key: 'avatarUrl',
-        label: 'Avatar URL',
-        placeholder: 'https://...',
-        value: this.avatarUrl,
-        onChange: (value: string) => {
-          this.avatarUrl = value.trim();
-          this.update();
-        },
-      },
-      {
-        type: 'toggle',
-        key: 'useEmbed',
-        label: 'Use Embed',
-        value: this.useEmbed,
-        onChange: (value: boolean) => {
-          this.useEmbed = value;
-          this.update();
-        },
-      },
-      {
-        type: 'color',
-        key: 'embedColor',
-        label: 'Embed Color',
-        value: this.embedColor,
-        disabled: !this.useEmbed,
-        onChange: (value: unknown) => {
-          this.embedColor = value as string;
-          this.update();
-        },
-      },
-      {
-        type: 'button',
-        key: 'test',
-        label: 'Send Test Message',
-        onClick: async () => {
-          await this.sendDiscordMessage({
-            content: this.testMessage,
-            username: this.username || undefined,
-            avatar_url: this.avatarUrl || undefined,
-            embeds: this.useEmbed ? [{
-              title: 'Test Embed',
-              description: 'This is a test message from the Rete.js Discord Webhook Node.',
-              color: this.hexToDecimal(this.embedColor),
-              timestamp: new Date().toISOString(),
-            }] : undefined,
-          });
-        },
-      },
-    ];
+    this.addControl('webhookUrl', new ClassicPreset.InputControl('text', { 
+      initial: this.data.webhookUrl, change: (value) => { this.data.webhookUrl = value; this.update(); }
+    }));
+    this.addControl('username', new ClassicPreset.InputControl('text', { 
+      initial: this.data.username, change: (value) => { this.data.username = value; this.update(); }
+    }));
+    this.addControl('avatarUrl', new ClassicPreset.InputControl('text', { 
+      initial: this.data.avatarUrl, change: (value) => { this.data.avatarUrl = value; this.update(); }
+    }));
+    this.addControl('useEmbed', new ClassicPreset.InputControl('text', { // TODO: change to checkbox
+      initial: this.data.useEmbed ? 'true' : 'false',
+      change: (value) => { this.data.useEmbed = value === 'true'; this.update(); }
+    }));
+    this.addControl('embedColor', new ClassicPreset.InputControl('text', { // type 'color' not standard
+      initial: this.data.embedColor, change: (value) => { this.data.embedColor = value; this.update(); }
+    }));
   }
 
   private hexToDecimal(hex: string): number {
@@ -164,15 +84,15 @@ export class DiscordWebhookNode extends BaseNode {
   }
 
   private async sendDiscordMessage(payload: DiscordWebhookPayload): Promise<{ success: boolean; response: any }> {
-    if (!this.webhookUrl) {
+    if (!this.data.webhookUrl) {
       const errorMsg = 'Webhook URL is required';
-      this.log(errorMsg, 'error');
+      this.error(errorMsg);
       this.lastStatus = { success: false, message: errorMsg, timestamp: Date.now() };
       return { success: false, response: { error: errorMsg } };
     }
 
     try {
-      const response = await fetch(this.webhookUrl, {
+      const response = await fetch(this.data.webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,12 +104,12 @@ export class DiscordWebhookNode extends BaseNode {
       
       if (!response.ok) {
         const errorMsg = responseData.message || `HTTP ${response.status} ${response.statusText}`;
-        this.log(`Failed to send message: ${errorMsg}`, 'error');
+        this.error(`Failed to send message: ${errorMsg}`);
         this.lastStatus = { success: false, message: errorMsg, timestamp: Date.now() };
         return { success: false, response: responseData };
       }
 
-      this.log('Message sent successfully', 'success');
+      this.info('Message sent successfully');
       this.lastStatus = { 
         success: true, 
         message: 'Message sent successfully', 
@@ -197,76 +117,44 @@ export class DiscordWebhookNode extends BaseNode {
       };
       
       return { success: true, response: responseData };
-    } catch (error) {
+    } catch (err: unknown) {
+      const error = err as Error;
       const errorMsg = error.message || 'Failed to send message';
-      this.log(`Error: ${errorMsg}`, 'error');
+      this.error(`Error: ${errorMsg}`);
       this.lastStatus = { success: false, message: errorMsg, timestamp: Date.now() };
       return { success: false, response: { error: errorMsg } };
     }
   }
 
-  protected async executeNode(
-    inputs: Record<string, any>,
-    context: any
-  ): Promise<Record<string, any>> {
-    const message = inputs.message;
-    const title = inputs.title;
-    const url = inputs.url;
-    const trigger = inputs.trigger !== undefined;
-
-    if (!trigger) {
-      this.log('No trigger received, skipping execution');
-      return {
-        success: false,
-        response: { error: 'No trigger received' },
-      };
-    }
-
-    if (!message && !title) {
-      const errorMsg = 'Either message or title is required';
-      this.log(errorMsg, 'error');
-      return {
-        success: false,
-        response: { error: errorMsg },
-      };
-    }
+  async executeNode(
+    inputs: { message?: string[], title?: string[], url?: string[] },
+    context: NodeContext
+  ): Promise<{ success: boolean, response: any }> {
+    const message = inputs.message?.[0] || this.data.message;
+    const title = inputs.title?.[0] || this.data.title;
+    const url = inputs.url?.[0] || this.data.url;
 
     const payload: DiscordWebhookPayload = {
-      username: this.username || undefined,
-      avatar_url: this.avatarUrl || undefined,
+      username: this.data.username || undefined,
+      avatar_url: this.data.avatarUrl || undefined,
     };
 
-    if (this.useEmbed) {
+    if (this.data.useEmbed) {
       payload.embeds = [{
         title: title || undefined,
         description: message || undefined,
         url: url || undefined,
-        color: this.hexToDecimal(this.embedColor),
+        color: this.hexToDecimal(this.data.embedColor),
         timestamp: new Date().toISOString(),
       }];
     } else {
       payload.content = message || title;
     }
 
-    const { success, response } = await this.sendDiscordMessage(payload);
-    
-    return {
-      success,
-      response,
-    };
+    return this.sendDiscordMessage(payload);
   }
 
   getLastStatus() {
     return this.lastStatus;
-  }
-
-  async onCreated() {
-    super.onCreated();
-    this.log('Discord Webhook Node created');
-  }
-
-  async onDestroy() {
-    this.log('Discord Webhook Node destroyed');
-    super.onDestroy();
   }
 }

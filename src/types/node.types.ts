@@ -67,7 +67,7 @@ export interface NodeExecutionResult {
   success: boolean;
   output?: Record<string, unknown>;
   error?: string;
-  logs?: string[];
+  logs?: { message: string; type: 'info' | 'warn' | 'error', timestamp: string }[];
   executionTime?: number;
   status?: 'pending' | 'running' | 'success' | 'error' | 'skipped';
   inputs?: Record<string, unknown>;

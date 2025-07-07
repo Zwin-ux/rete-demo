@@ -1,6 +1,7 @@
-import type { NodeEditor } from 'rete';
-import { BaseNode, BaseNodeData } from '../core/BaseNode';
-import { NodeInput, NodeOutput, NodeControl, NodeContext } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
+import { BaseNode, NodeScheme } from '../core/BaseNode';
+import { NodeContext } from '../types/node.types';
 import { isMockMode } from '../utils/mockLLM';
 
 // Define a type for the Reddit API response
@@ -20,11 +21,10 @@ type RedditApiResponse = {
   };
 };
 
-interface RedditScraperNodeData extends BaseNodeData {
+interface RedditScraperNodeData {
   subreddit: string;
   limit: number;
   time: 'hour' | 'day' | 'week' | 'month' | 'year' | 'all';
-  [key: string]: unknown;
 }
 
 export interface RedditPost {
@@ -37,140 +37,102 @@ export interface RedditPost {
   selftext?: string;
 }
 
+const socket = new ClassicPreset.Socket('socket');
+
 export class RedditScraperNode extends BaseNode<RedditScraperNodeData> {
-  private static readonly DEFAULT_LIMIT = 10;
-  private static readonly DEFAULT_TIME = 'day'; // hour, day, week, month, year, all
-
-  constructor(editor: NodeEditor) {
-    super(editor, 'reddit-scraper', 'Reddit Scraper');
-    
-    // Initialize node data
-    this.data = {
-      ...this.data,
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
+    super(editor, area, 'reddit-scraper', 'Reddit Scraper', {
       subreddit: 'ai',
-      limit: RedditScraperNode.DEFAULT_LIMIT,
-      time: RedditScraperNode.DEFAULT_TIME,
-    } as RedditScraperNodeData;
+      limit: 10,
+      time: 'day',
+    });
+
+    this.addOutput('posts', new ClassicPreset.Output(socket, 'Posts'));
+    this.addOutput('count', new ClassicPreset.Output(socket, 'Count'));
+
+    this.addControl('subreddit', new ClassicPreset.InputControl('text', {
+      initial: this.data.subreddit,
+      change: (value) => {
+        this.data.subreddit = value;
+        this.update();
+      }
+    }));
+
+    this.addControl('limit', new ClassicPreset.InputControl('number', {
+      initial: this.data.limit,
+      change: (value) => {
+        this.data.limit = Math.min(100, Math.max(1, Number(value) || 10));
+        this.update();
+      }
+    }));
+
+    // Note: A real 'select' control would be custom. This is a placeholder.
+    this.addControl('time', new ClassicPreset.InputControl('text', {
+      initial: this.data.time,
+      change: (value) => {
+        this.data.time = value as RedditScraperNodeData['time'];
+        this.update();
+      }
+    }));
   }
 
-  getInputs(): NodeInput[] {
-    return [];
-  }
-
-  getOutputs(): NodeOutput[] {
-    return [
-      { name: 'posts', type: 'RedditPost[]' },
-      { name: 'count', type: 'number' },
-    ];
-  }
-
-  getControls(): NodeControl[] {
-    return [
-      {
-        type: 'text',
-        key: 'subreddit',
-        value: this.data?.subreddit || 'ai',
-        setValue: (value: unknown) => {
-          if (this.data) {
-            this.data.subreddit = String(value);
-            this.update();
-          }
-        },
-      } as NodeControl,
-      {
-        type: 'number',
-        key: 'limit',
-        value: this.data?.limit || RedditScraperNode.DEFAULT_LIMIT,
-        setValue: (value: unknown) => {
-          if (this.data) {
-            this.data.limit = Math.min(100, Math.max(1, Number(value) || 10));
-            this.update();
-          }
-        },
-      } as NodeControl,
-      {
-        type: 'select',
-        key: 'time',
-        value: this.data?.time || RedditScraperNode.DEFAULT_TIME,
-        setValue: (value: any) => {
-          if (this.data) {
-            this.data.time = String(value);
-          }
-        },
-      } as NodeControl,
-    ];
-  }
-
-  private async fetchRedditPosts(subreddit: string, limit: number, time: string): Promise<{ posts: any[], count: number }> {
+  private async fetchRedditPosts(subreddit: string, limit: number, time: string): Promise<{ posts: RedditPost[], count: number }> {
     // Mock implementation for now
-    return {
-      posts: Array.from({ length: limit }, (_, i) => ({
-        title: `Mock Post ${i + 1} from r/${subreddit}`,
-        url: `#mock-post-${i + 1}`,
-        score: Math.floor(Math.random() * 1000),
-        author: `user${Math.floor(Math.random() * 1000)}`,
-        permalink: `#mock-post-${i + 1}`,
-        created_utc: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 86400),
-      })),
-      count: limit
-    };
+    if (isMockMode()) {
+      this.warn('Using mock Reddit data - running in demo mode');
+      return {
+        posts: Array.from({ length: limit }, (_, i) => ({
+          title: `Mock Post ${i + 1} from r/${subreddit}`,
+          url: `#mock-post-${i + 1}`,
+          score: Math.floor(Math.random() * 1000),
+          author: `user${Math.floor(Math.random() * 1000)}`,
+          permalink: `#mock-post-${i + 1}`,
+          created_utc: Math.floor(Date.now() / 1000) - Math.floor(Math.random() * 86400),
+          selftext: 'This is a mock post.'
+        })),
+        count: limit
+      };
+    }
+
+    // Real implementation
+    const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?limit=${limit}&t=${time}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json() as RedditApiResponse;
+    const posts: RedditPost[] = data.data.children.map(({ data: post }) => ({
+      title: post.title,
+      url: `https://reddit.com${post.permalink}`,
+      score: post.score,
+      permalink: post.permalink,
+      author: post.author,
+      created_utc: post.created_utc,
+      selftext: post.selftext,
+    }));
+    return { posts, count: posts.length };
   }
 
-  async executeNode(inputs: Record<string, unknown>, context: NodeContext): Promise<{ success: boolean; output?: Record<string, unknown>; error?: string }> {
+  async executeNode(
+    inputs: {},
+    context: NodeContext
+  ): Promise<{ posts: RedditPost[], count: number }> {
     try {
-      const { subreddit, limit, time } = this.data;
+    const { subreddit, limit, time } = this.data;
+    this.info(`Fetching ${limit} posts from r/${subreddit} (${time} time range)`);
 
-      this.log(`Fetching ${limit} posts from r/${subreddit} (${time} time range)`);
-      
-      // Use mock data in demo mode
-      if (isMockMode()) {
-        this.log('⚠️ Using mock Reddit data - running in demo mode');
-        const { posts, count } = await this.fetchRedditPosts(subreddit, limit, time);
-        return { success: true, output: { posts, count } };
-      }
-      
-      // Real implementation
-      const response = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?limit=${limit}&t=${time}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json() as RedditApiResponse;
-      
-      const posts: RedditPost[] = data.data.children.map(({ data: post }) => ({
-        title: post.title,
-        url: `https://reddit.com${post.permalink}`,
-        score: post.score,
-        permalink: post.permalink,
-        author: post.author,
-        created_utc: post.created_utc,
-        selftext: post.selftext,
-      }));
+    const { posts, count } = await this.fetchRedditPosts(subreddit, limit, time);
 
-      this.log(`Successfully fetched ${posts.length} posts`);
-      
-      return { 
-        success: true, 
-        output: { 
-          posts, 
-          count: posts.length 
-        } 
-      };
+    this.info(`Successfully fetched ${posts.length} posts`);
+
+    return {
+      posts,
+      count
+    };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.log(`Error: ${errorMessage}`);
+      this.error(`Error: ${errorMessage}`);
       throw error;
     }
-  }
-
-  onCreated() {
-    this.log('Reddit Scraper node created');
-  }
-
-  onDestroy() {
-    super.onDestroy();
-    this.log('Reddit Scraper node destroyed');
   }
 }

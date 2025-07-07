@@ -1,104 +1,67 @@
-import { NodeEditor } from 'rete';
-import { BaseNode } from '../core/BaseNode';
-import { NodeInput, NodeOutput, NodeControl } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
+import { BaseNode, NodeScheme } from '../core/BaseNode';
+import { NodeContext } from '../types/node.types';
 
-export class SummarizerNode extends BaseNode {
-  private summaryLength: 'short' | 'medium' | 'long' = 'medium';
-  private focusPoints: string = '';
-  private language: string = 'english';
-  private format: 'paragraph' | 'bullet' | 'numbered' = 'paragraph';
+type SummaryLength = 'short' | 'medium' | 'long';
+type SummaryFormat = 'paragraph' | 'bullet' | 'numbered';
 
-  constructor(editor: NodeEditor) {
-    super(editor, 'summarizer', 'Text Summarizer');
-  }
+type NodeData = {
+  summaryLength: SummaryLength;
+  focusPoints: string;
+  language: string;
+  format: SummaryFormat;
+}
 
-  getInputs(): NodeInput[] {
-    return [
-      { 
-        name: 'text', 
-        type: 'string', 
-        description: 'Text content to summarize',
-        required: true
-      },
-      { 
-        name: 'focus', 
-        type: 'string', 
-        description: 'Optional focus points or key aspects to emphasize in the summary',
-        required: false
-      },
-    ];
-  }
+const socket = new ClassicPreset.Socket('socket');
 
-  getOutputs(): NodeOutput[] {
-    return [
-      { 
-        name: 'summary', 
-        type: 'string', 
-        description: 'Generated summary' 
-      },
-      { 
-        name: 'length', 
-        type: 'number', 
-        description: 'Character count of the generated summary' 
-      },
-    ];
-  }
+export class SummarizerNode extends BaseNode<NodeData> {
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
+    super(editor, area, 'summarizer', 'Text Summarizer', {
+      summaryLength: 'medium',
+      focusPoints: '',
+      language: 'english',
+      format: 'paragraph',
+    });
 
-  getControls(): NodeControl[] {
-    return [
-      {
-        type: 'select',
-        key: 'summaryLength',
-        label: 'Summary Length',
-        options: [
-          { value: 'short', label: 'Short (1-2 sentences)' },
-          { value: 'medium', label: 'Medium (3-5 sentences)' },
-          { value: 'long', label: 'Long (5+ sentences)' },
-        ],
-        value: this.summaryLength,
-        onChange: (value: 'short' | 'medium' | 'long') => {
-          this.summaryLength = value;
-          this.update();
-        },
-      },
-      {
-        type: 'select',
-        key: 'format',
-        label: 'Format',
-        options: [
-          { value: 'paragraph', label: 'Paragraph' },
-          { value: 'bullet', label: 'Bullet Points' },
-          { value: 'numbered', label: 'Numbered List' },
-        ],
-        value: this.format,
-        onChange: (value: 'paragraph' | 'bullet' | 'numbered') => {
-          this.format = value;
-          this.update();
-        },
-      },
-      {
-        type: 'text',
-        key: 'focusPoints',
-        label: 'Focus Points',
-        placeholder: 'Comma-separated key points to focus on',
-        value: this.focusPoints,
-        onChange: (value: string) => {
-          this.focusPoints = value;
-          this.update();
-        },
-      },
-      {
-        type: 'text',
-        key: 'language',
-        label: 'Language',
-        placeholder: 'e.g., english, spanish, french',
-        value: this.language,
-        onChange: (value: unknown) => {
-          this.language = (value as string).trim().toLowerCase();
-          this.update();
-        },
-      },
-    ];
+    this.addInput('text', new ClassicPreset.Input(socket, 'Text', true));
+    this.addInput('focus', new ClassicPreset.Input(socket, 'Focus'));
+
+    this.addOutput('summary', new ClassicPreset.Output(socket, 'Summary'));
+    this.addOutput('length', new ClassicPreset.Output(socket, 'Length'));
+
+    // In a real app, these would be custom select controls
+    this.addControl('summaryLength', new ClassicPreset.InputControl('text', {
+      initial: this.data.summaryLength,
+      change: (value) => {
+        this.data.summaryLength = value as SummaryLength;
+        this.update();
+      }
+    }));
+
+    this.addControl('format', new ClassicPreset.InputControl('text', {
+      initial: this.data.format,
+      change: (value) => {
+        this.data.format = value as SummaryFormat;
+        this.update();
+      }
+    }));
+
+    this.addControl('focusPoints', new ClassicPreset.InputControl('text', {
+      initial: this.data.focusPoints,
+      change: (value) => {
+        this.data.focusPoints = value;
+        this.update();
+      }
+    }));
+
+    this.addControl('language', new ClassicPreset.InputControl('text', {
+      initial: this.data.language,
+      change: (value) => {
+        this.data.language = value;
+        this.update();
+      }
+    }));
   }
 
   private buildPrompt(text: string, focus: string = ''): string {
@@ -114,63 +77,51 @@ export class SummarizerNode extends BaseNode {
       numbered: 'a numbered list',
     };
 
-    let prompt = `Please provide a summary of the following text in ${lengthMap[this.summaryLength]} `;
-    prompt += `as ${formatMap[this.format]}. `;
+    let prompt = `Please provide a summary of the following text in ${lengthMap[this.data.summaryLength]} `;
+    prompt += `as ${formatMap[this.data.format]}. `;
     
     if (focus) {
       prompt += `Focus on these aspects: ${focus}. `;
     }
     
-    prompt += `The summary should be in ${this.language}.\n\n`;
+    prompt += `The summary should be in ${this.data.language}.\n\n`;
     prompt += `Text to summarize:\n${text}`;
     
     return prompt;
   }
 
-  protected async executeNode(
-    inputs: Record<string, any>,
-    context: any
-  ): Promise<Record<string, any>> {
-    const text = inputs.text;
-    const focus = inputs.focus || this.focusPoints;
+  async executeNode(
+    inputs: { text?: string[], focus?: string[] },
+    context: NodeContext
+  ): Promise<{ summary: string, length: number }> {
+    const text = inputs.text?.[0];
+    const focus = inputs.focus?.[0] || this.data.focusPoints;
     
     if (!text) {
-      throw new Error('Text input is required for summarization');
+      this.warn('Text input is required for summarization');
+      return { summary: '', length: 0 };
     }
 
-    this.log(`Generating ${this.summaryLength} summary (${this.format} format)`);
+    this.info(`Generating ${this.data.summaryLength} summary (${this.data.format} format)`);
     
     try {
       // In a real implementation, this would call an LLM service
-      // For now, we'll simulate a simple summary
       const prompt = this.buildPrompt(text, focus);
       
-      // This is where you would integrate with an LLM service
-      // For example: const summary = await llmService.generate(prompt);
-      
       // Simulated response
-      const summary = `[Summary placeholder] This is a simulated ${this.summaryLength} summary in ${this.format} format. ` +
+      const summary = `[Summary placeholder] This is a simulated ${this.data.summaryLength} summary in ${this.data.format} format. ` +
                      `The original text was ${text.length} characters long.`;
       
-      this.log('Summary generated successfully');
+      this.info('Summary generated successfully');
       
       return {
         summary,
         length: summary.length,
       };
     } catch (error) {
-      this.log(`Error generating summary: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.error(`Error generating summary: ${errorMessage}`);
       throw error;
     }
-  }
-
-  async onCreated() {
-    super.onCreated();
-    this.log('Summarizer Node created');
-  }
-
-  async onDestroy() {
-    this.log('Summarizer Node destroyed');
-    super.onDestroy();
   }
 }

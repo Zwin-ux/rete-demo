@@ -5,6 +5,7 @@ import { NodeExecutionResult } from '../types/node.types';
 // Define a local type for the node
 type NodeType = {
   id: string;
+  label?: string;
   data: Record<string, unknown>;
   position: [number, number];
   inputs?: Record<string, unknown>;

@@ -1,5 +1,6 @@
 import { ClassicPreset, NodeEditor } from 'rete';
 import type { NodeEditor as ReteNodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
 import { NodeContext, NodeExecutionResult, NodeData as CustomNodeData } from '../types/node.types';
 import { NodeMemory } from './memory';
 
@@ -13,37 +14,58 @@ export interface BaseNodeData extends CustomNodeData {
   // Add any base properties common to all nodes here
 }
 
-export abstract class BaseNode<T extends BaseNodeData = BaseNodeData> extends ClassicPreset.Node {
-  protected logs: string[] = [];
+export abstract class BaseNode<
+  T extends {} = {}
+> extends ClassicPreset.Node<{
+    [key in string]?: ClassicPreset.Socket;
+  }> {
+  width = 180;
+  height = 120;
+
+  protected logs: { message: string; type: 'info' | 'warn' | 'error', timestamp: string }[] = [];
+  protected maxLogs: number = 50;
   protected memory: NodeMemory;
   protected editor: ReteNodeEditor<NodeScheme>;
+  protected area: AreaPlugin<NodeScheme, any>;
   
   public data: T;
 
-  constructor(editor: ReteNodeEditor<NodeScheme>, key: string, name: string) {
+  constructor(editor: ReteNodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>, key: string, name: string, initialData: T = {} as T) {
     super(key);
+    this.label = name;
     this.editor = editor;
+    this.area = area;
     this.memory = new NodeMemory(this.id);
     
-    this.data = {
-      id: this.id,
-      name,
-      type: key,
-    } as T;
+    this.data = initialData;
   }
   
-  protected log(message: string, level: 'info' | 'warn' | 'error' = 'info'): void {
+  protected log(message: string, type: 'info' | 'warn' | 'error' = 'info'): void {
     const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] ${message}`;
-    this.logs.push(logMessage);
-    
-    if (level === 'error') {
-      console.error(`[${this.data?.name || 'Node'}] ${message}`);
-    } else if (level === 'warn') {
-      console.warn(`[${this.data?.name || 'Node'}] ${message}`);
-    } else {
-      console.log(`[${this.data?.name || 'Node'}] ${message}`);
+    this.logs.unshift({ timestamp, message, type });
+    if (this.logs.length > this.maxLogs) {
+      this.logs.pop();
     }
+    this.update();
+    if (type === 'error') {
+      console.error(`[${this.label}] ${message}`);
+    } else if (type === 'warn') {
+      console.warn(`[${this.label}] ${message}`);
+    } else {
+      console.log(`[${this.label}] ${message}`);
+    }
+  }
+
+  info(message: string) {
+    this.log(message, 'info');
+  }
+
+  warn(message: string) {
+    this.log(message, 'warn');
+  }
+
+  error(message: string) {
+    this.log(message, 'error');
   }
 
   protected clearLogs(): void {
@@ -101,7 +123,7 @@ export abstract class BaseNode<T extends BaseNodeData = BaseNodeData> extends Cl
 
   // Method to trigger a UI update for the node
   public update(): void {
-    this.editor.update(this.id);
+    this.area.update('node', this.id);
   }
 
   // Lifecycle methods (can be overridden by child classes)

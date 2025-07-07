@@ -1,42 +1,21 @@
-import { NodeEditor } from 'rete';
-import { BaseNode } from '../core/BaseNode';
-import { NodeOutput } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
+import { BaseNode, NodeScheme } from '../core/BaseNode';
+import { NodeContext } from '../types/node.types';
 
-export class StartNode extends BaseNode {
-  constructor(editor: NodeEditor<NodeScheme>) {
-    super(editor, 'start', 'Start');
+const socket = new ClassicPreset.Socket('socket');
+
+export class StartNode extends BaseNode<{}> {
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
+    super(editor, area, 'start', 'Start');
+    this.addOutput('exec', new ClassicPreset.Output(socket, 'Exec'));
   }
 
-  getInputs() {
-    return [];
-  }
-
-  getOutputs(): NodeOutput[] {
-    return [
-      { 
-        name: 'trigger', 
-        type: 'event', 
-        description: 'Trigger signal to start the workflow' 
-      },
-    ];
-  }
-
-  getControls() {
-    return [];
-  }
-
-  protected async executeNode(): Promise<Record<string, any>> {
-    this.log('Workflow started');
-    return { trigger: true };
-  }
-
-  async onCreated() {
-    super.onCreated();
-    this.log('Start Node created');  
-  }
-
-  async onDestroy() {
-    this.log('Start Node destroyed');
-    super.onDestroy();
+  async executeNode(
+    inputs: {},
+    context: NodeContext
+  ): Promise<{ exec: boolean }> {
+    this.info('Workflow started');
+    return { exec: true };
   }
 }

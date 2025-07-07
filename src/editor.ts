@@ -1,6 +1,6 @@
 import { NodeEditor, ClassicPreset } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
-import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
+import { ConnectionPlugin } from 'rete-connection-plugin';
 import { AutoArrangePlugin } from 'rete-auto-arrange-plugin';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
@@ -18,72 +18,61 @@ import { SummarizerNode } from './nodes/SummarizerNode';
 
 // Types
 type Position = { x: number; y: number };
+type Node = ClassicPreset.Node & { width: number; height: number };
+
+class Connection<A extends Node, B extends Node> extends ClassicPreset.Connection<A, B> {}
+
+type Schemes = {
+    Node: Node;
+    Connection: Connection<Node, Node>;
+};
+
 type NodeTypes = 'trigger' | 'http' | 'condition' | 'log' | 'console-log' | 'discord-webhook' | 'keyword-filter' | 'llm-agent' | 'memory-read' | 'memory-write' | 'reddit-scraper' | 'start' | 'summarizer';
 
 // Socket for connections
 const socket = new ClassicPreset.Socket('socket');
 
 // Node factory
-export const createNode = (type: string, position: { x: number; y: number }, editor: NodeEditor) => {
-    let node;
-    
+export const createNode = (type: string, editor: NodeEditor<Schemes>, area: AreaPlugin<Schemes, any>) => {
     switch (type) {
         case 'start':
-            node = new StartNode(editor);
-            break;
+            return new StartNode(editor, area);
         case 'reddit-scraper':
-            node = new RedditScraperNode(editor);
-            break;
+            return new RedditScraperNode(editor, area);
         case 'keyword-filter':
-            node = new KeywordFilterNode(editor);
-            break;
+            return new KeywordFilterNode(editor, area);
         case 'summarizer':
-            node = new SummarizerNode(editor);
-            break;
+            return new SummarizerNode(editor, area);
         case 'llm-agent':
-            node = new LLMAgentNode(editor);
-            break;
+            return new LLMAgentNode(editor, area);
         case 'console-log':
-            node = new ConsoleLogNode(editor);
-            break;
+            return new ConsoleLogNode(editor, area);
         case 'discord-webhook':
-            node = new DiscordWebhookNode(editor);
-            break;
+            return new DiscordWebhookNode(editor, area);
         case 'memory-read':
-            node = new MemoryReadNode(editor);
-            break;
+            return new MemoryReadNode(editor, area);
         case 'memory-write':
-            node = new MemoryWriteNode(editor);
-            break;
+            return new MemoryWriteNode(editor, area);
         default:
             throw new Error(`Unknown node type: ${type}`);
     }
-    
-    node.position = [position.x, position.y];
-    return node;
-};
-
-// Define schemes for the editor
-type EditorSchemes = {
-  Node: ClassicPreset.Node;
-  Connection: ClassicPreset.Connection<ClassicPreset.Node, ClassicPreset.Node>;
 };
 
 // Initialize editor
 export async function initEditor(container: HTMLElement) {
   // Create editor and plugins
-  const editor = new NodeEditor<EditorSchemes>();
-  const area = new AreaPlugin<EditorSchemes, any>(container);
+  const editor = new NodeEditor<Schemes>();
+  const area = new AreaPlugin<Schemes, any>(container);
   
   // Setup editor with area plugin
   editor.use(area);
   
   // Setup connection plugin
-  const connection = new ConnectionPlugin<EditorSchemes, any>();
+  const connection = new ConnectionPlugin<Schemes, any>();
   area.use(connection);
   
   // Setup auto-arrange
-  const arrange = new AutoArrangePlugin<EditorSchemes>();
+  const arrange = new AutoArrangePlugin<Schemes>();
   area.use(arrange);
   
   // Enable zoom and pan
@@ -91,32 +80,20 @@ export async function initEditor(container: HTMLElement) {
     accumulating: AreaExtensions.accumulateOnCtrl()
   });
   
-  // Enable area selection
-  AreaExtensions.selectableArea(area);
-  
   // Enable grid snapping
   AreaExtensions.snapGrid(area, { size: 10, dynamic: true });
 
-    // Add default nodes
-    const startNode = createNode('start', { x: 100, y: 100 }, editor);
-    const redditScraperNode = createNode('reddit-scraper', { x: 400, y: 100 }, editor);
-    const keywordFilterNode = createNode('keyword-filter', { x: 700, y: 100 }, editor);
-    const summarizerNode = createNode('summarizer', { x: 1000, y: 100 }, editor);
-    const llmAgentNode = createNode('llm-agent', { x: 1300, y: 100 }, editor);
-    const consoleLogNode = createNode('console-log', { x: 1600, y: 100 }, editor);
-    const discordWebhookNode = createNode('discord-webhook', { x: 1900, y: 100 }, editor);
-    const memoryReadNode = createNode('memory-read', { x: 2200, y: 100 }, editor);
-    const memoryWriteNode = createNode('memory-write', { x: 2500, y: 100 }, editor);
-
+    const startNode = new StartNode(editor, area);
     await editor.addNode(startNode);
-    await editor.addNode(redditScraperNode);
-    await editor.addNode(keywordFilterNode);
-    await editor.addNode(summarizerNode);
-    await editor.addNode(llmAgentNode);
-    await editor.addNode(consoleLogNode);
-    await editor.addNode(discordWebhookNode);
-    await editor.addNode(memoryReadNode);
-    await editor.addNode(memoryWriteNode);
+    await area.translate(startNode.id, { x: 0, y: 0 });
+
+    const redditNode = new RedditScraperNode(editor, area);
+    await editor.addNode(redditNode);
+    await area.translate(redditNode.id, { x: 270, y: 0 });
+
+    await editor.addConnection(
+      new ClassicPreset.Connection(startNode, 'exec', redditNode, 'exec')
+    );
 
     try {
         // Auto arrange nodes if available
@@ -182,8 +159,6 @@ export function handleNodeDrop(container: HTMLElement, onDrop: (type: string, po
             onDrop(type, position);
         }
     });
-    
-    return { editor, area };
 }
 
 // Helper function to create React root
@@ -195,32 +170,4 @@ function createRoot(component: React.ReactNode) {
 }
 
 // Export types for other modules
-export type { Position, NodeTypes };
-
-// Export editor instance types
-export type { NodeEditor, AreaPlugin, ConnectionPlugin, AutoArrangePlugin };
-
-// Extend type declarations for Rete.js
-declare module 'rete' {
-  interface NodeEditor<Schemes = any> {
-    use(plugin: any, options?: any): any;
-  }
-}
-
-declare module 'rete-area-plugin' {
-  interface AreaPlugin<Schemes = any, T = any> {
-    use(plugin: any, options?: any): any;
-  }
-}
-
-declare module 'rete-connection-plugin' {
-  interface ConnectionPlugin<Schemes = any, T = any> {
-    use(plugin: any, options?: any): any;
-  }
-}
-
-declare module 'rete-auto-arrange-plugin' {
-  interface AutoArrangePlugin<Schemes = any> {
-    use(plugin: any, options?: any): any;
-  }
-}
+export type { Position, NodeTypes, Schemes, NodeEditor, AreaPlugin, ConnectionPlugin, AutoArrangePlugin };

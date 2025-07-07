@@ -1,77 +1,56 @@
-import { NodeEditor } from 'rete';
-import { BaseNode } from '../core/BaseNode';
-import { NodeInput, NodeOutput, NodeControl } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
+import { BaseNode, NodeScheme } from '../core/BaseNode';
+import { NodeContext } from '../types/node.types';
 
-export class KeywordFilterNode extends BaseNode {
-  private keywords: string[] = [];
-  private caseSensitive: boolean = false;
+type NodeData = {
+  keywords: string[];
+  caseSensitive: boolean;
+}
 
-  constructor(editor: NodeEditor) {
-    super(editor, 'keyword-filter', 'Keyword Filter');
-  }
+const socket = new ClassicPreset.Socket('socket');
 
-  getInputs(): NodeInput[] {
-    return [
-      { 
-        name: 'input', 
-        type: 'any', 
-        description: 'Input data to filter (can be string, array, or object with text properties)',
-        required: true
-      },
-    ];
-  }
+export class KeywordFilterNode extends BaseNode<NodeData> {
 
-  getOutputs(): NodeOutput[] {
-    return [
-      { 
-        name: 'output', 
-        type: 'any', 
-        description: 'Filtered output (same type as input)' 
-      },
-      { 
-        name: 'matches', 
-        type: 'number', 
-        description: 'Number of matches found' 
-      },
-    ];
-  }
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
+    super(editor, area, 'keyword-filter', 'Keyword Filter', {
+      keywords: [],
+      caseSensitive: false,
+    });
 
-  getControls(): NodeControl[] {
-    return [
-      {
-        type: 'text',
-        key: 'keywords',
-        label: 'Keywords (comma-separated)',
-        placeholder: 'gpt, ai, machine learning',
-        value: this.keywords.join(', '),
-        onChange: (value: string) => {
-          this.keywords = value
-            .split(',')
-            .map(k => k.trim())
-            .filter(k => k.length > 0);
-          this.update();
-        },
-      },
-      {
-        type: 'toggle',
-        key: 'caseSensitive',
-        label: 'Case Sensitive',
-        value: this.caseSensitive,
-        onChange: (value: unknown) => {
-          this.caseSensitive = value as boolean;
-          this.update();
-        },
-      },
-    ];
+    this.addInput('input', new ClassicPreset.Input(socket, 'Input', true));
+
+    this.addOutput('output', new ClassicPreset.Output(socket, 'Output'));
+    this.addOutput('matches', new ClassicPreset.Output(socket, 'Matches'));
+
+    this.addControl('keywords', new ClassicPreset.InputControl('text', {
+      initial: this.data.keywords.join(', '),
+      change: (value) => {
+        this.data.keywords = value
+          .split(',')
+          .map(k => k.trim())
+          .filter(k => k.length > 0);
+        this.update();
+      }
+    }));
+
+    // A proper toggle would be a custom control.
+    this.addControl('caseSensitive', new ClassicPreset.InputControl('text', {
+      initial: String(this.data.caseSensitive),
+      change: (value) => {
+        this.data.caseSensitive = value === 'true';
+        this.update();
+      }
+    }));
   }
 
   private containsKeywords(text: string): boolean {
     if (!text || typeof text !== 'string') return false;
     
-    const searchText = this.caseSensitive ? text : text.toLowerCase();
+    const searchText = this.data.caseSensitive ? text : text.toLowerCase();
     
-    return this.keywords.some(keyword => {
-      const searchKeyword = this.caseSensitive ? keyword : keyword.toLowerCase();
+    return this.data.keywords.some(keyword => {
+      const searchKeyword = this.data.caseSensitive ? keyword : keyword.toLowerCase();
       return searchText.includes(searchKeyword);
     });
   }
@@ -113,25 +92,26 @@ export class KeywordFilterNode extends BaseNode {
     return { filtered: result, matches };
   }
 
-  protected async executeNode(
-    inputs: Record<string, any>,
-    context: any
-  ): Promise<Record<string, any>> {
-    const input = inputs.input;
+  async executeNode(
+    inputs: { input?: any[] },
+    context: NodeContext
+  ): Promise<{ output: any, matches: number }> {
+    const input = inputs.input?.[0];
     
     if (!input) {
-      throw new Error('Input is required');
+      this.warn('Input is required');
+      return { output: undefined, matches: 0 };
     }
 
-    if (this.keywords.length === 0) {
-      this.log('No keywords specified, passing through all input');
+    if (this.data.keywords.length === 0) {
+      this.info('No keywords specified, passing through all input');
       return {
         output: input,
         matches: Array.isArray(input) ? input.length : 1,
       };
     }
 
-    this.log(`Filtering with keywords: ${this.keywords.join(', ')}`);
+    this.info(`Filtering with keywords: ${this.data.keywords.join(', ')}`);
     
     let result: any;
     let matches: number = 0;
@@ -154,21 +134,11 @@ export class KeywordFilterNode extends BaseNode {
       result = input;
     }
 
-    this.log(`Found ${matches} matches`);
+    this.info(`Found ${matches} matches`);
     
     return {
       output: result,
       matches,
     };
-  }
-
-  async onCreated() {
-    super.onCreated();
-    this.log('Keyword Filter Node created');
-  }
-
-  async onDestroy() {
-    this.log('Keyword Filter Node destroyed');
-    super.onDestroy();
   }
 }

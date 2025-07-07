@@ -1,91 +1,41 @@
-import { NodeEditor } from 'rete';
-import { BaseNode } from '../core/BaseNode';
-import { NodeInput, NodeOutput, NodeControl } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
+import { BaseNode, NodeScheme } from '../core/BaseNode';
+import { NodeContext } from '../types/node.types';
 
-export class MemoryWriteNode extends BaseNode {
-  private memoryKey: string = '';
-  private autoExecute: boolean = false;
-  private ttl: number = 0; // Time to live in seconds (0 = no expiration)
+type NodeData = {
+  memoryKey: string;
+  autoExecute: boolean;
+  ttl: number;
+};
 
-  constructor(editor: NodeEditor) {
-    super(editor, 'memory-write', 'Write Memory');
-  }
+const socket = new ClassicPreset.Socket('socket');
 
-  getInputs(): NodeInput[] {
-    return [
-      { 
-        name: 'key', 
-        type: 'string', 
-        description: 'Memory key to write to',
-        required: true
-      },
-      { 
-        name: 'value', 
-        type: 'any', 
-        description: 'Value to store in memory',
-        required: true
-      },
-      { 
-        name: 'trigger', 
-        type: 'event', 
-        description: 'Trigger to write the value',
-        required: false
-      },
-    ];
-  }
+export class MemoryWriteNode extends BaseNode<NodeData> {
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
+    super(editor, area, 'memory-write', 'Write Memory', {
+      memoryKey: '',
+      autoExecute: false,
+      ttl: 0, // 0 = no expiration
+    });
 
-  getOutputs(): NodeOutput[] {
-    return [
-      { 
-        name: 'success', 
-        type: 'boolean', 
-        description: 'Whether the write was successful' 
-      },
-      { 
-        name: 'trigger', 
-        type: 'event', 
-        description: 'Triggered after successful write' 
-      },
-    ];
-  }
+    this.addInput('key', new ClassicPreset.Input(socket, 'Key'));
+    this.addInput('value', new ClassicPreset.Input(socket, 'Value'));
+    this.addInput('trigger', new ClassicPreset.Input(socket, 'Trigger'));
 
-  getControls(): NodeControl[] {
-    return [
-      {
-        type: 'text',
-        key: 'memoryKey',
-        label: 'Memory Key',
-        placeholder: 'Enter memory key',
-        value: this.memoryKey,
-        onChange: (value: string) => {
-          this.memoryKey = value.trim();
-          this.update();
-        },
-      },
-      {
-        type: 'toggle',
-        key: 'autoExecute',
-        label: 'Auto-write on input change',
-        value: this.autoExecute,
-        onChange: (value: boolean) => {
-          this.autoExecute = value;
-          this.update();
-        },
-      },
-      {
-        type: 'number',
-        key: 'ttl',
-        label: 'Expiration (seconds)',
-        description: 'Time until the value expires (0 = never)',
-        min: 0,
-        step: 1,
-        value: this.ttl,
-        onChange: (value: unknown) => {
-          this.ttl = Math.max(0, value as number);
-          this.update();
-        },
-      },
-    ];
+    this.addOutput('success', new ClassicPreset.Output(socket, 'Success'));
+    this.addOutput('trigger', new ClassicPreset.Output(socket, 'Trigger'));
+
+    this.addControl('memoryKey', new ClassicPreset.InputControl('text', {
+      initial: this.data.memoryKey, change: (value) => { this.data.memoryKey = value; this.update(); }
+    }));
+    this.addControl('autoExecute', new ClassicPreset.InputControl('text', { // TODO: change to checkbox
+      initial: this.data.autoExecute ? 'true' : 'false',
+      change: (value) => { this.data.autoExecute = value === 'true'; this.update(); }
+    }));
+    this.addControl('ttl', new ClassicPreset.InputControl('number', {
+      initial: this.data.ttl, change: (value) => { this.data.ttl = value; this.update(); }
+    }));
   }
 
   private async storeWithExpiration(key: string, value: any, ttl: number) {
@@ -93,63 +43,43 @@ export class MemoryWriteNode extends BaseNode {
       value,
       expires: ttl > 0 ? Date.now() + ttl * 1000 : null,
     };
-    
     await this.memory.set(key, item);
   }
 
-  protected async executeNode(
-    inputs: Record<string, any>,
-    context: any
-  ): Promise<Record<string, any>> {
-    const key = inputs.key || this.memoryKey;
-    const value = inputs.value;
+  async executeNode(
+    inputs: { key?: string[], value?: any[], trigger?: any[] },
+    context: NodeContext
+  ): Promise<{ success: boolean, trigger?: boolean, error?: string }> {
+    const key = inputs.key?.[0] || this.data.memoryKey;
+    const value = inputs.value?.[0];
     const trigger = inputs.trigger !== undefined;
     
     if (!key) {
-      throw new Error('Memory key is required');
+      this.warn('Memory key is required');
+      return { success: false };
     }
 
-    // If auto-execute is off and there's no trigger, don't write
-    if (!this.autoExecute && !trigger) {
-      this.log('Skipping write - no trigger and auto-write is disabled');
-      return {
-        success: false,
-        trigger: false,
-      };
+    if (!this.data.autoExecute && !trigger) {
+      this.info('Skipping write: no trigger and auto-write is disabled');
+      return { success: false, trigger: false };
     }
 
-    this.log(`Writing to memory: ${key}`);
+    this.info(`Writing to memory: ${key}`);
     
     try {
       if (value === undefined) {
         throw new Error('No value provided to write');
       }
       
-      await this.storeWithExpiration(key, value, this.ttl);
+      await this.storeWithExpiration(key, value, this.data.ttl);
       
-      this.log(`Successfully wrote value to memory${this.ttl > 0 ? ` (expires in ${this.ttl} seconds)` : ''}`);
+      this.info(`Successfully wrote value to memory${this.data.ttl > 0 ? ` (expires in ${this.data.ttl}s)` : ''}`);
       
-      return {
-        success: true,
-        trigger: true,
-      };
+      return { success: true, trigger: true };
     } catch (error) {
-      this.log(`Error writing to memory: ${error.message}`);
-      return {
-        success: false,
-        trigger: false,
-        error: error.message,
-      };
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.error(`Error writing to memory: ${errorMessage}`);
+      return { success: false, trigger: false, error: errorMessage };
     }
-  }
-
-  async onCreated() {
-    super.onCreated();
-    this.log('Memory Write Node created');
-  }
-
-  async onDestroy() {
-    this.log('Memory Write Node destroyed');
-    super.onDestroy();
   }
 }

@@ -1,172 +1,84 @@
-import { NodeEditor } from 'rete';
-import { BaseNode } from '../core/BaseNode';
-import { NodeInput, NodeOutput, NodeControl } from '../types/node.types';
+import { ClassicPreset, NodeEditor } from 'rete';
+import { AreaPlugin } from 'rete-area-plugin';
+import { BaseNode, NodeScheme } from '../core/BaseNode';
+import { NodeContext } from '../types/node.types';
 import { mockLLMRequest, isMockMode } from '../utils/mockLLM';
+import { ButtonControl } from '../core/Control';
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
-interface LLMControlData {
+type NodeData = {
   model: string;
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
   apiKey: string;
+  messages: OpenAIMessage[];
 }
 
-export class LLMAgentNode extends BaseNode {
-  private static readonly DEFAULT_MODEL = 'gpt-3.5-turbo';
-  private static readonly DEFAULT_TEMPERATURE = 0.7;
-  private static readonly DEFAULT_MAX_TOKENS = 1000;
+const socket = new ClassicPreset.Socket('socket');
 
-  private apiKey: string = '';
-  private model: string = LLMAgentNode.DEFAULT_MODEL;
-  private temperature: number = LLMAgentNode.DEFAULT_TEMPERATURE;
-  private maxTokens: number = LLMAgentNode.DEFAULT_MAX_TOKENS;
-  private systemPrompt: string = 'You are a helpful AI assistant.';
-  private messages: OpenAIMessage[] = [];
-
-  constructor(editor: NodeEditor) {
-    super(editor, 'llm-agent', 'LLM Agent');
+export class LLMAgentNode extends BaseNode<NodeData> {
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
+    super(editor, area, 'llm-agent', 'LLM Agent', {
+      model: 'gpt-3.5-turbo',
+      temperature: 0.7,
+      maxTokens: 1000,
+      systemPrompt: 'You are a helpful AI assistant.',
+      apiKey: '',
+      messages: [],
+    });
     this.initializeMessages();
+
+    this.addInput('input', new ClassicPreset.Input(socket, 'Input', true));
+    this.addInput('systemPrompt', new ClassicPreset.Input(socket, 'System Prompt'));
+
+    this.addOutput('output', new ClassicPreset.Output(socket, 'Output'));
+    this.addOutput('usage', new ClassicPreset.Output(socket, 'Usage'));
+
+    this.addControl('apiKey', new ClassicPreset.InputControl('text', {
+      initial: this.data.apiKey, change: (value) => { this.data.apiKey = value; this.update(); }
+    }));
+    this.addControl('model', new ClassicPreset.InputControl('text', {
+      initial: this.data.model, change: (value) => { this.data.model = value; this.update(); }
+    }));
+    this.addControl('temperature', new ClassicPreset.InputControl('number', {
+      initial: this.data.temperature, change: (value) => { this.data.temperature = value; this.update(); }
+    }));
+    this.addControl('maxTokens', new ClassicPreset.InputControl('number', {
+      initial: this.data.maxTokens, change: (value) => { this.data.maxTokens = value; this.update(); }
+    }));
+    this.addControl('systemPrompt', new ClassicPreset.InputControl('text', {
+      initial: this.data.systemPrompt, change: (value) => { this.data.systemPrompt = value; this.initializeMessages(); this.update(); }
+    }));
+    this.addControl('clear', new ButtonControl('Clear Conversation', () => this.clearConversation()));
   }
 
   private initializeMessages() {
-    this.messages = [
-      {
-        role: 'system',
-        content: this.systemPrompt,
-      },
-    ];
-  }
-
-  getInputs(): NodeInput[] {
-    return [
-      { 
-        name: 'input', 
-        type: 'any', 
-        description: 'Input to send to the LLM',
-        required: true
-      },
-      { 
-        name: 'systemPrompt', 
-        type: 'string', 
-        description: 'System prompt to guide the LLM behavior',
-        required: false
-      },
-    ];
-  }
-
-  getOutputs(): NodeOutput[] {
-    return [
-      { 
-        name: 'output', 
-        type: 'string', 
-        description: 'LLM generated response' 
-      },
-      { 
-        name: 'usage', 
-        type: 'object', 
-        description: 'Token usage information' 
-      },
-    ];
-  }
-
-  getControls(): NodeControl[] {
-    return [
-      {
-        type: 'password',
-        key: 'apiKey',
-        label: 'OpenAI API Key',
-        placeholder: 'sk-...',
-        value: this.apiKey,
-        onChange: (value: string) => {
-          this.apiKey = value.trim();
-          this.update();
-        },
-      },
-      {
-        type: 'select',
-        key: 'model',
-        label: 'Model',
-        options: [
-          { value: 'gpt-4', label: 'GPT-4' },
-          { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-          { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-          { value: 'gpt-3.5-turbo-16k', label: 'GPT-3.5 Turbo 16K' },
-        ],
-        value: this.model,
-        onChange: (value: string) => {
-          this.model = value;
-          this.update();
-        },
-      },
-      {
-        type: 'slider',
-        key: 'temperature',
-        label: 'Temperature',
-        min: 0,
-        max: 2,
-        step: 0.1,
-        value: this.temperature,
-        onChange: (value: number) => {
-          this.temperature = value;
-          this.update();
-        },
-      },
-      {
-        type: 'number',
-        key: 'maxTokens',
-        label: 'Max Tokens',
-        min: 1,
-        max: 4096,
-        value: this.maxTokens,
-        onChange: (value: number) => {
-          this.maxTokens = Math.min(4096, Math.max(1, value));
-          this.update();
-        },
-      },
-      {
-        type: 'textarea',
-        key: 'systemPrompt',
-        label: 'System Prompt',
-        placeholder: 'You are a helpful assistant...',
-        value: this.systemPrompt,
-        onChange: (value: unknown) => {
-          this.systemPrompt = value as string;
-          this.initializeMessages();
-          this.update();
-        },
-      },
-    ];
+    this.data.messages = [{ role: 'system', content: this.data.systemPrompt }];
   }
 
   private async callOpenAI(messages: OpenAIMessage[]) {
-    if (!this.apiKey) {
+    if (!this.data.apiKey) {
       throw new Error('OpenAI API key is required');
     }
 
-    this.log('Sending request to OpenAI API...');
+    this.info('Sending request to OpenAI API...');
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': `Bearer ${this.data.apiKey}`,
       },
       body: JSON.stringify({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: this.systemPrompt,
-          },
-          ...messages,
-        ],
-        temperature: this.temperature,
-        max_tokens: this.maxTokens,
+        model: this.data.model,
+        messages,
+        temperature: this.data.temperature,
+        max_tokens: this.data.maxTokens,
       }),
     });
 
@@ -177,39 +89,37 @@ export class LLMAgentNode extends BaseNode {
       );
     }
 
-    const data = await response.json();
-    return data;
+    return response.json();
   }
 
-  protected async executeNode(
-    inputs: Record<string, any>,
-    context: any
-  ): Promise<Record<string, any>> {
-    const input = inputs.input;
-    const systemPrompt = inputs.systemPrompt || this.systemPrompt;
+  async executeNode(
+    inputs: { input?: any[], systemPrompt?: string[] },
+    context: NodeContext
+  ): Promise<{ output: string, usage: object }> {
+    const input = inputs.input?.[0];
+    const systemPrompt = inputs.systemPrompt?.[0] || this.data.systemPrompt;
 
-    if (systemPrompt !== this.systemPrompt) {
-      this.systemPrompt = systemPrompt;
+    if (systemPrompt !== this.data.systemPrompt) {
+      this.data.systemPrompt = systemPrompt;
       this.initializeMessages();
     }
 
     if (!input) {
-      throw new Error('Input is required');
+      this.warn('Input is required');
+      return { output: '', usage: {} };
     }
 
-    // Add user message to conversation history
     const userMessage: OpenAIMessage = {
       role: 'user',
       content: typeof input === 'string' ? input : JSON.stringify(input),
     };
 
-    this.messages.push(userMessage);
-    this.log('Sending to LLM: ' + userMessage.content.substring(0, 100) + '...');
+    this.data.messages.push(userMessage);
+    this.info('Sending to LLM: ' + userMessage.content.substring(0, 100) + '...');
 
     try {
-      // Use mock mode if no API key is provided
-      if (isMockMode() && !this.apiKey) {
-        this.log('⚠️ Using mock LLM mode - no API key provided');
+      if (isMockMode() && !this.data.apiKey) {
+        this.info('⚠️ Using mock LLM mode - no API key provided');
         const response = await mockLLMRequest(input, systemPrompt);
         return {
           output: response,
@@ -221,37 +131,26 @@ export class LLMAgentNode extends BaseNode {
         };
       }
 
-      const response = await this.callOpenAI(this.messages);
-      
+      const response = await this.callOpenAI(this.data.messages);
       const assistantMessage = response.choices[0].message;
-      this.messages.push(assistantMessage);
+      this.data.messages.push(assistantMessage);
 
-      this.log(`Received response (${response.usage.total_tokens} tokens used)`);
+      this.info(`Received response (${response.usage.total_tokens} tokens used)`);
       
       return {
         output: assistantMessage.content,
         usage: response.usage,
       };
     } catch (error) {
-      this.log(`Error calling OpenAI: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.error(`Error calling OpenAI: ${errorMessage}`);
       throw error;
     }
   }
 
-  async clearConversation() {
-    this.messages = [];
+  clearConversation() {
     this.initializeMessages();
-    this.log('Conversation history cleared');
+    this.info('Conversation history cleared');
     this.update();
-  }
-
-  async onCreated() {
-    super.onCreated();
-    this.log('LLM Agent Node created');
-  }
-
-  async onDestroy() {
-    this.log('LLM Agent Node destroyed');
-    super.onDestroy();
   }
 }

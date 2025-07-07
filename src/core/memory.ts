@@ -14,13 +14,13 @@ export class NodeMemory {
     this.prefix = `${NAMESPACE}${nodeId}-`;
   }
 
-  async get<T = any>(key: string): Promise<T | null> {
+  async get<T = any>(key: string): Promise<T | undefined> {
     try {
       const value = localStorage.getItem(this.prefix + key);
-      return value ? JSON.parse(value) : null;
+      return value ? JSON.parse(value) : undefined;
     } catch (error) {
       console.error(`Error reading from memory (${this.prefix}${key}):`, error);
-      return null;
+      return undefined;
     }
   }
 
@@ -33,12 +33,13 @@ export class NodeMemory {
     }
   }
 
-  async delete(key: string): Promise<void> {
+  async delete(key: string): Promise<boolean> {
     try {
       localStorage.removeItem(this.prefix + key);
+      return true;
     } catch (error) {
       console.error(`Error deleting from memory (${this.prefix}${key}):`, error);
-      throw error;
+      return false;
     }
   }
 

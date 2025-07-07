@@ -45,7 +45,7 @@ async function initializeApp() {
 
   try {
     // Initialize editor
-    const { editor } = await initEditor(container);
+    const { editor, area } = await initEditor(container);
     
     // Initialize node palette
     initNodePalette(palette, (type) => {
@@ -57,13 +57,15 @@ async function initializeApp() {
       e.preventDefault();
       const type = e.dataTransfer?.getData('application/node-type');
         if (type) {
+          const node = createNode(type, editor, area);
+          await editor.addNode(node);
+
           const rect = container.getBoundingClientRect();
           const position = {
             x: e.clientX - rect.left,
             y: e.clientY - rect.top
           };
-          const node = createNode(type, position, editor);
-          await editor.addNode(node);
+          await area.translate(node.id, position);
         }
     });
     
@@ -83,7 +85,7 @@ async function initializeApp() {
           .then(res => res.json());
         
         if (workflow) {
-          await loadWorkflow(editor, workflow);
+          await loadWorkflow(editor as any, workflow);
           console.log('Loaded demo workflow:', DEMO_CONFIG.DEFAULT_WORKFLOW);
           
           // Auto-run the workflow if configured
