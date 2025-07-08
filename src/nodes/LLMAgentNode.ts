@@ -40,8 +40,7 @@ export class LLMAgentNode extends BaseNode<NodeData> {
     this.addOutput('usage', new ClassicPreset.Output(socket, 'Usage'));
 
     this.addControl('apiKey', new ClassicPreset.InputControl('text', {
-      initial: this.data.apiKey, change: (value) => { this.data.apiKey = value; this.update(); },
-      placeholder: 'Enter OpenAI API Key'
+      initial: this.data.apiKey, change: (value) => { this.data.apiKey = value; this.update(); }
     }));
     this.addControl('model', new ClassicPreset.InputControl('text', {
       initial: this.data.model, change: (value) => { this.data.model = value; this.update(); }

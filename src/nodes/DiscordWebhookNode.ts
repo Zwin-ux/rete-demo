@@ -62,8 +62,7 @@ export class DiscordWebhookNode extends BaseNode<NodeData> {
     this.addOutput('response', new ClassicPreset.Output(socket, 'Response'));
 
     this.addControl('webhookUrl', new ClassicPreset.InputControl('text', { 
-      initial: this.data.webhookUrl, change: (value) => { this.data.webhookUrl = value; this.update(); },
-      placeholder: 'Enter Discord Webhook URL'
+      initial: this.data.webhookUrl, change: (value) => { this.data.webhookUrl = value; this.update(); }
     }));
     this.addControl('username', new ClassicPreset.InputControl('text', { 
       initial: this.data.username, change: (value) => { this.data.username = value; this.update(); }
