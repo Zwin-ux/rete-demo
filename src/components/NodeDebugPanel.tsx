@@ -223,6 +223,7 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
         </div>
         <div className="flex items-center space-x-2">
           <button 
+            title="Close"
             className="text-gray-500 hover:text-gray-700"
             onClick={(e) => {
               e.stopPropagation();
@@ -234,6 +235,7 @@ const NodeDebugPanel: React.FC<NodeDebugPanelProps> = ({ node, executionState, o
             </svg>
           </button>
           <button 
+            title={isExpanded ? 'Collapse' : 'Expand'}
             className="text-gray-500 hover:text-gray-700"
             onClick={(e) => {
               e.stopPropagation();

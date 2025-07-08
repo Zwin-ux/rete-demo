@@ -1,6 +1,7 @@
-import { initEditor, initNodePalette, createNode } from './editor';
+import { initEditor, initNodePalette, createNode, handleNodeDrop } from './editor';
 import { loadWorkflow } from './utils/workflowUtils';
 import { DEMO_CONFIG, isDemoMode } from './config/demo';
+import { createAIAgentDemoWorkflow } from './workflows/aiAgentDemo';
 
 declare global {
   interface Window {
@@ -33,7 +34,7 @@ function showDemoBanner() {
 
 async function initializeApp() {
   const container = document.getElementById('editor') as HTMLElement;
-  const palette = document.getElementById('node-palette') as HTMLElement;
+  const palette = document.querySelector('.node-palette') as HTMLElement;
   
   if (!container || !palette) {
     console.error('Could not find editor or palette element');
@@ -53,56 +54,22 @@ async function initializeApp() {
     });
     
     // Handle node drop on the editor
-    container.addEventListener('drop', async (e: DragEvent) => {
-      e.preventDefault();
-      const type = e.dataTransfer?.getData('application/node-type');
-        if (type) {
-          const node = createNode(type, editor, area);
-          await editor.addNode(node);
-
-          const rect = container.getBoundingClientRect();
-          const position = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-          };
-          await area.translate(node.id, position);
-        }
-    });
-    
-    // Allow drop
-    container.addEventListener('dragover', (e) => {
-      e.preventDefault();
+    handleNodeDrop(container, area, async (type, position) => {
+      const node = createNode(type, editor, area);
+      await editor.addNode(node);
+      await area.translate(node.id, position);
     });
 
     // Make editor available globally for debugging
     window.editor = editor;
     
-    // Load demo workflow if in demo mode
-    if (isDemoMode() && DEMO_CONFIG.DEFAULT_WORKFLOW) {
-      try {
-        // Load the default workflow
-        const workflow = await fetch(`/workflows/${DEMO_CONFIG.DEFAULT_WORKFLOW}.json`)
-          .then(res => res.json());
-        
-        if (workflow) {
-          await loadWorkflow(editor as any, workflow);
-          console.log('Loaded demo workflow:', DEMO_CONFIG.DEFAULT_WORKFLOW);
-          
-          // Auto-run the workflow if configured
-          if (DEMO_CONFIG.UI?.AUTO_RUN) {
-            setTimeout(() => {
-              const runButton = document.querySelector('[data-action="run-workflow"]') as HTMLElement;
-              if (runButton) {
-                runButton.click();
-                console.log('Auto-running workflow...');
-              }
-            }, 1000);
-          }
-        }
-      } catch (error) {
-        const err = error as Error;
-        console.error('Failed to load demo workflow:', err);
-      }
+    // Load the AI Agent Demo Workflow by default
+    try {
+      await createAIAgentDemoWorkflow(editor, area);
+      console.log('Loaded AI Agent Demo Workflow');
+    } catch (error) {
+      const err = error as Error;
+      console.error('Failed to load AI Agent Demo Workflow:', err);
     }
 
   } catch (error) {

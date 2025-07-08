@@ -36,7 +36,7 @@ export const DEMO_CONFIG = {
   },
   
   // Default workflow to load in demo mode
-  DEFAULT_WORKFLOW: 'reddit-ai-summarizer',
+  DEFAULT_WORKFLOW: 'ai-agent-demo',
   
   // Help text to show in the UI
   HELP_TEXT: {

@@ -2,13 +2,18 @@ import { ClassicPreset, NodeEditor } from 'rete';
 import { AreaPlugin } from 'rete-area-plugin';
 import { BaseNode, NodeScheme } from '../core/BaseNode';
 import { NodeContext } from '../types/node.types';
-
-const socket = new ClassicPreset.Socket('socket');
+import { SocketType } from '../utils/connectionUtils';
 
 export class ConsoleLogNode extends BaseNode<{ message: string }> {
   constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>) {
     super(editor, area, 'console-log', 'Console Log', { message: 'Hello World!' });
-    this.addInput('message', new ClassicPreset.Input(socket, 'Message', true));
+    
+    // Add execution input and output for workflow control
+    this.addExecInput('exec', '►');
+    this.addExecOutput('exec', '►');
+    
+    // Add data input for the message
+    this.addDataInput('message', 'Message', true);
 
     this.addControl('message', new ClassicPreset.InputControl('text', {
       initial: this.data.message,

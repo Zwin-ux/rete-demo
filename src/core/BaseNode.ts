@@ -1,6 +1,7 @@
 import { ClassicPreset, NodeEditor } from 'rete';
-import type { NodeEditor as ReteNodeEditor } from 'rete';
 import { AreaPlugin } from 'rete-area-plugin';
+import { NodeConnectionHelper } from './NodeConnectionHelper';
+import { SocketType } from '../utils/connectionUtils';
 import { NodeContext, NodeExecutionResult, NodeData as CustomNodeData } from '../types/node.types';
 import { NodeMemory } from './memory';
 
@@ -25,12 +26,12 @@ export abstract class BaseNode<
   protected logs: { message: string; type: 'info' | 'warn' | 'error', timestamp: string }[] = [];
   protected maxLogs: number = 50;
   protected memory: NodeMemory;
-  protected editor: ReteNodeEditor<NodeScheme>;
+  protected editor: NodeEditor<NodeScheme>;
   protected area: AreaPlugin<NodeScheme, any>;
   
   public data: T;
 
-  constructor(editor: ReteNodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>, key: string, name: string, initialData: T = {} as T) {
+  constructor(editor: NodeEditor<NodeScheme>, area: AreaPlugin<NodeScheme, any>, key: string, name: string, initialData: T = {} as T) {
     super(key);
     this.label = name;
     this.editor = editor;
@@ -85,12 +86,64 @@ export abstract class BaseNode<
     };
   }
 
+  /**
+   * Execute the node's logic
+   * @param inputs Node inputs
+   * @param context Node execution context
+   */
   protected abstract executeNode(
     inputs: Record<string, any>,
     context: NodeContext
   ): Promise<Record<string, any>>;
 
-  async run(inputs: Record<string, any> = {}): Promise<NodeExecutionResult> {
+  /**
+   * Add an execution input to this node
+   * @param name Input name
+   * @param label Display label
+   */
+  protected addExecInput(name: string = 'exec', label: string = '►') {
+    return NodeConnectionHelper.addInput(this, name, label, SocketType.EXEC);
+  }
+  
+  /**
+   * Add an execution output to this node
+   * @param name Output name
+   * @param label Display label
+   */
+  protected addExecOutput(name: string = 'exec', label: string = '►') {
+    return NodeConnectionHelper.addOutput(this, name, label, SocketType.EXEC);
+  }
+  
+  /**
+   * Add a data input to this node
+   * @param name Input name
+   * @param label Display label
+   * @param multipleConnections Whether this input can accept multiple connections
+   */
+  protected addDataInput(name: string, label: string, multipleConnections: boolean = false) {
+    return NodeConnectionHelper.addDataInput(this, name, label, multipleConnections);
+  }
+  
+  /**
+   * Add a data output to this node
+   * @param name Output name
+   * @param label Display label
+   */
+  protected addDataOutput(name: string, label: string) {
+    return NodeConnectionHelper.addDataOutput(this, name, label);
+  }
+  
+  /**
+   * Set up standard execution sockets (input and output)
+   * @param hasMultipleOutputs Whether to add multiple execution outputs
+   * @param outputNames Names for multiple outputs
+   */
+  protected setupExecutionSockets(hasMultipleOutputs: boolean = false, outputNames: string[] = ["then"]) {
+    NodeConnectionHelper.addExecutionSockets(this, hasMultipleOutputs, outputNames);
+    return this;
+  }
+
+  async run(inputs: Record<string, any> = {}): Promise<Record<string, any>> {
     this.clearLogs();
     this.log('Node execution started');
 

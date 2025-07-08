@@ -7,9 +7,11 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <header class="header">
+        <h1>Workflow Editor</h1>
+    </header>
     <div id="app">
-        <div class="toolbar">
-            <h1>Workflow Editor</h1>
+        <aside class="sidebar">
             <div class="node-palette">
                 <h3>Nodes</h3>
                 <div class="node-item" data-type="trigger">Trigger</div>
@@ -17,9 +19,12 @@
                 <div class="node-item" data-type="condition">Condition</div>
                 <div class="node-item" data-type="log">Log</div>
             </div>
-        </div>
-        <div id="editor" class="editor"></div>
+        </aside>
+        <main id="editor" class="editor"></main>
     </div>
+    <footer class="footer">
+        <p>RETE.js Demo</p>
+    </footer>
     <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

@@ -47,6 +47,8 @@ export class RedditScraperNode extends BaseNode<RedditScraperNodeData> {
       time: 'day',
     });
 
+    this.addInput('exec', new ClassicPreset.Input(socket, 'Exec'));
+
     this.addOutput('posts', new ClassicPreset.Output(socket, 'Posts'));
     this.addOutput('count', new ClassicPreset.Output(socket, 'Count'));
 
