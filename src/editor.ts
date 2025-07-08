@@ -112,6 +112,13 @@ export async function initEditor(container: HTMLElement) {
         } else {
           context.data.element.classList.add('any-connection');
         }
+        
+        // Create path element for animation if it doesn't exist
+        if (!context.data.element.querySelector('path')) {
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', context.data.element.getAttribute('d') || '');
+          context.data.element.appendChild(path);
+        }
       }
     }
     

@@ -151,8 +151,8 @@ body, html {
   cursor: pointer;
   border: 2px solid white;
   border-radius: 50%;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   margin: 6px;
   vertical-align: middle;
   z-index: 2;
@@ -160,6 +160,8 @@ body, html {
   position: relative;
   transition: all 0.15s ease-in-out;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  /* Make sockets more visible with a subtle pulse animation */
+  animation: socketPulse 2s infinite alternate;
 }
 
 .socket:hover {
@@ -232,12 +234,20 @@ body, html {
 
 /* Connection styling */
 .connection {
-  stroke-width: 3px;
+  stroke-width: 4px;
   stroke-linecap: round;
   stroke-linejoin: round;
   fill: none;
   pointer-events: stroke;
-  transition: stroke 0.2s;
+  transition: all 0.2s;
+  opacity: 0.85;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+}
+
+.connection:hover {
+  stroke-width: 6px;
+  opacity: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 .connection.exec-connection {
@@ -252,9 +262,28 @@ body, html {
   stroke: #fac05e;
 }
 
-.connection:hover {
-  stroke-width: 4px;
-  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
+/* Connection path animation */
+.connection path {
+  stroke-dasharray: 8;
+  animation: flowAnimation 30s linear infinite;
+}
+
+@keyframes flowAnimation {
+  to {
+    stroke-dashoffset: 800;
+  }
+}
+
+/* Socket pulse animation */
+@keyframes socketPulse {
+  from {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transform: scale(1);
+  }
+  to {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transform: scale(1.1);
+  }
 }
 
 /* Ensure nodes remain visible and on top during drag */
