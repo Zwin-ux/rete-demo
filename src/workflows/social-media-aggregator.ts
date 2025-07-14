@@ -32,11 +32,11 @@ export async function createSocialMediaAggregator(
   editor.addNode(discordWebhook);
 
   // Position nodes in the editor
-  startNode.position = [50, 200];
-  redditScraper.position = [300, 100];
-  linkedInScraper.position = [300, 300];
-  keywordFilter.position = [600, 200];
-  discordWebhook.position = [900, 200];
+  (startNode as any).position = [50, 200];
+  (redditScraper as any).position = [300, 100];
+  (linkedInScraper as any).position = [300, 300];
+  (keywordFilter as any).position = [600, 200];
+  (discordWebhook as any).position = [900, 200];
 
   // Configure nodes
   // Reddit Scraper configuration
@@ -63,27 +63,27 @@ export async function createSocialMediaAggregator(
   // Create connections
   // Start -> Reddit Scraper
   editor.addConnection(new ClassicPreset.Connection(
-    startNode, 'exec', redditScraper, 'exec'
+    startNode as any, 'exec', redditScraper as any, 'exec'
   ));
 
   // Start -> LinkedIn Scraper
   editor.addConnection(new ClassicPreset.Connection(
-    startNode, 'exec', linkedInScraper, 'exec'
+    startNode as any, 'exec', linkedInScraper as any, 'exec'
   ));
 
   // Reddit Scraper -> Keyword Filter
   editor.addConnection(new ClassicPreset.Connection(
-    redditScraper, 'posts', keywordFilter, 'input'
+    redditScraper as any, 'posts', keywordFilter as any, 'input'
   ));
 
   // LinkedIn Scraper -> Keyword Filter
   editor.addConnection(new ClassicPreset.Connection(
-    linkedInScraper, 'posts', keywordFilter, 'input'
+    linkedInScraper as any, 'posts', keywordFilter as any, 'input'
   ));
 
   // Keyword Filter -> Discord Webhook
   editor.addConnection(new ClassicPreset.Connection(
-    keywordFilter, 'filtered', discordWebhook, 'message'
+    keywordFilter as any, 'filtered', discordWebhook as any, 'message'
   ));
 
   return {
