@@ -11,7 +11,7 @@ import { UndoRedoControls } from './components/UndoRedoControls';
 import { Header } from './components/Header';
 import { initNodeGroupStyling } from './utils/nodeGroupUtils';
 import { validateConnection, getSocketColor, SocketType } from './utils/connectionUtils';
-import { CustomSocket } from './components/CustomSocket';vvvvv
+import { CustomSocket } from './components/CustomSocket';
 import { ConsoleLogNode } from './nodes/ConsoleLogNode';
 import { DiscordWebhookNode } from './nodes/DiscordWebhookNode';
 import { HttpRequestNode } from './nodes/HttpRequestNode';
@@ -106,7 +106,10 @@ export async function initEditor(container: HTMLElement) {
   
   // Initialize node group manager for node grouping functionality
   const nodeGroupManager = new NodeGroupManager(editor, area);
-  
+
+  // Initialize node group styling
+  initNodeGroupStyling();
+
   // Create and render the header
   const headerContainer = document.createElement('div');
   headerContainer.className = 'editor-header-container';
@@ -114,7 +117,7 @@ export async function initEditor(container: HTMLElement) {
   
   // Render the Header component with React
   const headerRoot = ReactDOM.createRoot(headerContainer);
-  headerRoot.render(React.createElement(Header, { historyManager }));
+  headerRoot.render(React.createElement(Header, { historyManager, nodeGroupManager }));
   
   // Setup editor with area plugin
   editor.use(area);

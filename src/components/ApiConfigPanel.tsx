@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NodeEditor } from 'rete';
 import { NodeScheme } from '../core/BaseNode';
+import '../../styles/api-config-panel.css';
 
 interface ApiKey {
   service: string;
@@ -45,7 +46,9 @@ export const ApiConfigPanel: React.FC<ApiConfigPanelProps> = ({ editor }) => {
     // Broadcast API key changes to nodes
     editor.getNodes().forEach(node => {
       if ('onApiKeyUpdate' in node) {
-        const service = node.name.toLowerCase().split(' ')[0];
+        // Access node name safely with type assertion
+        const nodeName = (node as any).name || '';
+        const service = nodeName.toString().toLowerCase().split(' ')[0];
         const apiKey = apiKeys.find(k => k.service === service);
         if (apiKey) {
           (node as any).onApiKeyUpdate?.(apiKey);
@@ -75,82 +78,23 @@ export const ApiConfigPanel: React.FC<ApiConfigPanelProps> = ({ editor }) => {
         <button 
           className="api-config-button"
           onClick={() => setIsOpen(true)}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            zIndex: 1000,
-            padding: '8px 16px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
         >
           Configure API Keys
         </button>
       ) : (
-        <div 
-          className="api-config-modal"
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '600px',
-            backgroundColor: 'white',
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-            zIndex: 1001,
-            borderRadius: '8px',
-            overflow: 'hidden'
-          }}
-        >
-          <div 
-            className="api-config-header"
-            style={{
-              padding: '16px',
-              backgroundColor: '#f5f5f5',
-              borderBottom: '1px solid #ddd',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}
-          >
-            <h2 style={{ margin: 0 }}>API Configuration</h2>
-            <button 
-              onClick={() => setIsOpen(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '18px',
-                cursor: 'pointer'
-              }}
-            >
-              ×
-            </button>
+        <div className="api-config-modal">
+
+          <div className="api-config-header">
+            <h2>API Configuration</h2>
+            <button onClick={() => setIsOpen(false)}>×</button>
           </div>
           
-          <div 
-            className="api-config-tabs"
-            style={{
-              display: 'flex',
-              borderBottom: '1px solid #ddd'
-            }}
-          >
+          <div className="api-config-tabs">
             {apiKeys.map(key => (
               <button
                 key={key.service}
-                className={`api-tab ${activeTab === key.service ? 'active' : ''}`}
+                className={`api-config-tab ${activeTab === key.service ? 'active' : ''}`}
                 onClick={() => setActiveTab(key.service)}
-                style={{
-                  padding: '12px 24px',
-                  border: 'none',
-                  background: activeTab === key.service ? '#fff' : '#f5f5f5',
-                  borderBottom: activeTab === key.service ? '2px solid #4CAF50' : 'none',
-                  cursor: 'pointer',
-                  flex: 1
-                }}
               >
                 {key.service.charAt(0).toUpperCase() + key.service.slice(1)}
                 {key.isConfigured && ' ✓'}
@@ -158,29 +102,18 @@ export const ApiConfigPanel: React.FC<ApiConfigPanelProps> = ({ editor }) => {
             ))}
           </div>
           
-          <div 
-            className="api-config-content"
-            style={{
-              padding: '24px'
-            }}
-          >
+          <div className="api-config-content">
             {apiKeys.map(key => (
               <div 
                 key={key.service}
-                style={{
-                  display: activeTab === key.service ? 'block' : 'none'
-                }}
+                className={`api-config-tab-content ${activeTab === key.service ? 'active' : ''}`}
               >
                 <h3>{key.service.charAt(0).toUpperCase() + key.service.slice(1)} API Configuration</h3>
                 
-                <div style={{ marginBottom: '16px' }}>
+                <div className="api-config-form-group">
                   <label 
                     htmlFor={`${key.service}-key`}
-                    style={{
-                      display: 'block',
-                      marginBottom: '8px',
-                      fontWeight: 'bold'
-                    }}
+                    className="api-config-form-label"
                   >
                     API Key
                   </label>
@@ -189,25 +122,16 @@ export const ApiConfigPanel: React.FC<ApiConfigPanelProps> = ({ editor }) => {
                     type="password"
                     value={key.key}
                     onChange={(e) => handleKeyChange(key.service, 'key', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      border: '1px solid #ddd',
-                      borderRadius: '4px'
-                    }}
+                    className="api-config-form-input"
                     placeholder={`Enter your ${key.service} API key`}
                   />
                 </div>
                 
                 {key.service === 'twitter' || key.service === 'linkedin' ? (
-                  <div style={{ marginBottom: '16px' }}>
+                  <div className="api-config-form-group">
                     <label 
                       htmlFor={`${key.service}-secret`}
-                      style={{
-                        display: 'block',
-                        marginBottom: '8px',
-                        fontWeight: 'bold'
-                      }}
+                      className="api-config-form-label"
                     >
                       API Secret
                     </label>
@@ -216,26 +140,17 @@ export const ApiConfigPanel: React.FC<ApiConfigPanelProps> = ({ editor }) => {
                       type="password"
                       value={key.secret || ''}
                       onChange={(e) => handleKeyChange(key.service, 'secret', e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px'
-                      }}
+                      className="api-config-form-input"
                       placeholder={`Enter your ${key.service} API secret`}
                     />
                   </div>
                 ) : null}
                 
                 {key.service === 'twitter' ? (
-                  <div style={{ marginBottom: '16px' }}>
+                  <div className="api-config-form-group">
                     <label 
                       htmlFor="twitter-token"
-                      style={{
-                        display: 'block',
-                        marginBottom: '8px',
-                        fontWeight: 'bold'
-                      }}
+                      className="api-config-form-label"
                     >
                       Bearer Token
                     </label>
@@ -244,25 +159,20 @@ export const ApiConfigPanel: React.FC<ApiConfigPanelProps> = ({ editor }) => {
                       type="password"
                       value={key.token || ''}
                       onChange={(e) => handleKeyChange(key.service, 'token', e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px'
-                      }}
+                      className="api-config-form-input"
                       placeholder="Enter your Twitter bearer token"
                     />
                   </div>
                 ) : null}
                 
                 {key.service === 'discord' ? (
-                  <div style={{ marginBottom: '16px' }}>
+                  <div className="api-config-discord-instructions">
                     <p>For Discord, you need to create a webhook URL in your Discord server settings.</p>
                     <p>The webhook URL should be configured directly in the Discord Webhook node.</p>
                   </div>
                 ) : null}
                 
-                <div style={{ marginTop: '24px' }}>
+                <div className="api-config-instructions">
                   <h4>How to get {key.service.charAt(0).toUpperCase() + key.service.slice(1)} API credentials:</h4>
                   {key.service === 'reddit' && (
                     <ol>
@@ -292,7 +202,7 @@ export const ApiConfigPanel: React.FC<ApiConfigPanelProps> = ({ editor }) => {
                   {key.service === 'discord' && (
                     <ol>
                       <li>Open your Discord server settings</li>
-                      <li>Go to "Integrations" > "Webhooks"</li>
+                      <li>Go to "Integrations" {'>'} "Webhooks"</li>
                       <li>Click "New Webhook"</li>
                       <li>Configure the webhook name and channel</li>
                       <li>Copy the webhook URL to use in the Discord Webhook node</li>
@@ -303,26 +213,11 @@ export const ApiConfigPanel: React.FC<ApiConfigPanelProps> = ({ editor }) => {
             ))}
           </div>
           
-          <div 
-            className="api-config-footer"
-            style={{
-              padding: '16px',
-              backgroundColor: '#f5f5f5',
-              borderTop: '1px solid #ddd',
-              display: 'flex',
-              justifyContent: 'flex-end'
-            }}
+          <div className="api-config-footer"
           >
             <button
               onClick={handleSaveKeys}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#4CAF50',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+              className="api-config-save-button"
             >
               Save and Close
             </button>
