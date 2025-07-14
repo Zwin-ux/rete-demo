@@ -5,10 +5,13 @@ import { AutoArrangePlugin } from 'rete-auto-arrange-plugin';
 import { ReactPlugin, Presets, ReactArea2D } from 'rete-react-plugin';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
+import { HistoryManager } from './core/HistoryManager';
+import { NodeGroupManager } from './core/NodeGroupManager';
+import { UndoRedoControls } from './components/UndoRedoControls';
+import { Header } from './components/Header';
+import { initNodeGroupStyling } from './utils/nodeGroupUtils';
 import { validateConnection, getSocketColor, SocketType } from './utils/connectionUtils';
-import { CustomSocket } from './components/CustomSocket';
-
-// Import all custom nodes
+import { CustomSocket } from './components/CustomSocket';vvvvv
 import { ConsoleLogNode } from './nodes/ConsoleLogNode';
 import { DiscordWebhookNode } from './nodes/DiscordWebhookNode';
 import { HttpRequestNode } from './nodes/HttpRequestNode';
@@ -20,6 +23,9 @@ import { RedditScraperNode } from './nodes/RedditScraperNode';
 import { StartNode } from './nodes/StartNode';
 import { SummarizerNode } from './nodes/SummarizerNode';
 import { WebSocketNode } from './nodes/WebSocketNode';
+import { TwitterScraperNode } from './nodes/TwitterScraperNode';
+import { LinkedInScraperNode } from './nodes/LinkedInScraperNode';
+import { DataTransformNode } from './nodes/DataTransformNode';
 
 // Types
 type Position = { x: number; y: number };
@@ -32,7 +38,7 @@ type Schemes = {
     Connection: Connection<Node, Node>;
 };
 
-type NodeTypes = 'trigger' | 'http' | 'condition' | 'log' | 'console-log' | 'discord-webhook' | 'keyword-filter' | 'llm-agent' | 'memory-read' | 'memory-write' | 'reddit-scraper' | 'start' | 'summarizer' | 'http-request' | 'websocket';
+type NodeTypes = 'trigger' | 'http' | 'condition' | 'log' | 'console-log' | 'discord-webhook' | 'keyword-filter' | 'llm-agent' | 'memory-read' | 'memory-write' | 'reddit-scraper' | 'start' | 'summarizer' | 'http-request' | 'websocket' | 'twitter-scraper' | 'linkedin-scraper' | 'data-transform';
 
 // Define socket types for different connection types
 const execSocket = new ClassicPreset.Socket('exec');
@@ -73,6 +79,12 @@ export const createNode = (type: string, editor: NodeEditor<Schemes>, area: Area
             return new HttpRequestNode(editor, area);
         case 'websocket':
             return new WebSocketNode(editor, area);
+        case 'twitter-scraper':
+            return new TwitterScraperNode(editor, area);
+        case 'linkedin-scraper':
+            return new LinkedInScraperNode(editor, area);
+        case 'data-transform':
+            return new DataTransformNode(editor, area);
         default:
             throw new Error(`Unknown node type: ${type}`);
     }
@@ -80,9 +92,29 @@ export const createNode = (type: string, editor: NodeEditor<Schemes>, area: Area
 
 // Initialize editor
 export async function initEditor(container: HTMLElement) {
+  // Create parent container for the editor
+  const editorContainer = document.createElement('div');
+  editorContainer.className = 'editor-container';
+  container.appendChild(editorContainer);
+  
   // Create editor and plugins
   const editor = new NodeEditor<Schemes>();
-  const area = new AreaPlugin<Schemes, any>(container);
+  const area = new AreaPlugin<Schemes, any>(editorContainer);
+  
+  // Initialize history manager for undo/redo functionality
+  const historyManager = new HistoryManager(editor);
+  
+  // Initialize node group manager for node grouping functionality
+  const nodeGroupManager = new NodeGroupManager(editor, area);
+  
+  // Create and render the header
+  const headerContainer = document.createElement('div');
+  headerContainer.className = 'editor-header-container';
+  container.insertBefore(headerContainer, editorContainer);
+  
+  // Render the Header component with React
+  const headerRoot = ReactDOM.createRoot(headerContainer);
+  headerRoot.render(React.createElement(Header, { historyManager }));
   
   // Setup editor with area plugin
   editor.use(area);
@@ -236,66 +268,87 @@ export async function initEditor(container: HTMLElement) {
 
 // Initialize node palette
 export function initNodePalette(container: HTMLElement, onDragStart: (type: string) => void) {
-    // Group nodes by category for better organization
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Create node palette header
+    const header = document.createElement('h3');
+    header.textContent = 'Node Palette';
+    container.appendChild(header);
+    
+    // Define node categories
     const categories = [
         {
             name: 'Basic',
+            category: 'basic',
             nodes: [
-                { type: 'start', label: 'Start' },
-                { type: 'console-log', label: 'Console Log' }
+                { label: 'Start', type: 'start' },
+                { label: 'Console Log', type: 'console-log' },
             ]
         },
         {
             name: 'Network',
+            category: 'network',
             nodes: [
-                { type: 'http-request', label: 'HTTP Request' },
-                { type: 'websocket', label: 'WebSocket' },
-                { type: 'discord-webhook', label: 'Discord Webhook' }
+                { label: 'HTTP Request', type: 'http-request' },
+                { label: 'WebSocket', type: 'websocket' },
+                { label: 'Discord Webhook', type: 'discord-webhook' },
             ]
         },
         {
             name: 'AI & Data',
+            category: 'ai-data',
             nodes: [
-                { type: 'reddit-scraper', label: 'Reddit Scraper' },
-                { type: 'keyword-filter', label: 'Keyword Filter' },
-                { type: 'summarizer', label: 'Summarizer' },
-                { type: 'llm-agent', label: 'LLM Agent' }
+                { label: 'LLM Agent', type: 'llm-agent' },
+                { label: 'Keyword Filter', type: 'keyword-filter' },
+                { label: 'Summarizer', type: 'summarizer' },
+                { label: 'Data Transform', type: 'data-transform' },
             ]
         },
         {
             name: 'Storage',
+            category: 'storage',
             nodes: [
-                { type: 'memory-read', label: 'Memory Read' },
-                { type: 'memory-write', label: 'Memory Write' }
+                { label: 'Memory Read', type: 'memory-read' },
+                { label: 'Memory Write', type: 'memory-write' },
+            ]
+        },
+        {
+            name: 'Data Sources',
+            category: 'data-sources',
+            nodes: [
+                { label: 'Reddit Scraper', type: 'reddit-scraper' },
+                { label: 'Twitter Scraper', type: 'twitter-scraper' },
+                { label: 'LinkedIn Scraper', type: 'linkedin-scraper' },
             ]
         }
     ];
     
-    // Create category containers and add nodes to them
+    // Create node categories and items
     categories.forEach(category => {
-        // Create category header
         const categoryHeader = document.createElement('div');
         categoryHeader.className = 'node-category-header';
         categoryHeader.textContent = category.name;
         container.appendChild(categoryHeader);
         
-        // Create category container
         const categoryContainer = document.createElement('div');
         categoryContainer.className = 'node-category-container';
         container.appendChild(categoryContainer);
         
-        // Add nodes to this category
         category.nodes.forEach(nodeType => {
             const node = document.createElement('div');
             node.className = 'node-palette-item';
             node.textContent = nodeType.label;
-            node.draggable = true;
-            
-            // Add data attribute for filtering
-            node.dataset.category = category.name.toLowerCase().replace(/\s+/g, '-');
             node.dataset.nodeType = nodeType.type;
+            node.dataset.category = category.category;
+            node.dataset.description = `${nodeType.label} - ${category.name} node`;
+            node.draggable = true;
+            node.tabIndex = 0; // Make focusable for keyboard navigation
             
-            node.addEventListener('dragstart', (e: DragEvent) => {
+            // Add tooltip
+            node.title = nodeType.label;
+            
+            node.addEventListener('dragstart', (e) => {
                 if (e.dataTransfer) {
                     e.dataTransfer.setData('application/node-type', nodeType.type);
                     console.log('Drag started for type:', nodeType.type, 'dataTransfer:', e.dataTransfer);
@@ -308,51 +361,140 @@ export function initNodePalette(container: HTMLElement, onDragStart: (type: stri
                 document.getElementById('editor')?.classList.remove('dragging');
             });
             
+            // Add keyboard support for node selection
+            node.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    // Simulate drag and drop when Enter or Space is pressed
+                    const editorElement = document.getElementById('editor');
+                    if (editorElement) {
+                        const rect = editorElement.getBoundingClientRect();
+                        const position = {
+                            x: rect.width / 2,
+                            y: rect.height / 2
+                        };
+                        onDragStart(nodeType.type);
+                        // Create a custom event to handle the node creation
+                        const event = new CustomEvent('nodePaletteKeySelect', {
+                            detail: {
+                                type: nodeType.type,
+                                position
+                            }
+                        });
+                        document.dispatchEvent(event);
+                    }
+                }
+            });
+            
             categoryContainer.appendChild(node);
         });
     });
     
-    // Add search functionality to filter nodes
+    // Add search functionality with fuzzy search
     const searchBox = document.createElement('input');
     searchBox.type = 'text';
     searchBox.placeholder = 'Search nodes...';
     searchBox.className = 'node-palette-search';
     container.insertBefore(searchBox, container.firstChild);
     
-    searchBox.addEventListener('input', (e: Event) => {
-        const target = e.target as HTMLInputElement;
-        const searchTerm = target.value.toLowerCase();
-        
-        // Get all node items
-        const nodeItems = container.querySelectorAll('.node-palette-item');
-        const categoryHeaders = container.querySelectorAll('.node-category-header');
-        const categoryContainers = container.querySelectorAll('.node-category-container');
-        
-        // Reset visibility
-        categoryHeaders.forEach(header => (header as HTMLElement).style.display = 'block');
-        categoryContainers.forEach(container => (container as HTMLElement).style.display = 'block');
-        
-        if (searchTerm) {
-            // Filter nodes based on search term
-            nodeItems.forEach(item => {
-                const nodeLabel = item.textContent?.toLowerCase() || '';
-                const nodeType = (item as HTMLElement).dataset.nodeType?.toLowerCase() || '';
-                const visible = nodeLabel.includes(searchTerm) || nodeType.includes(searchTerm);
-                (item as HTMLElement).style.display = visible ? 'block' : 'none';
-            });
+    // Create search results container (initially hidden)
+    const searchResultsContainer = document.createElement('div');
+    searchResultsContainer.className = 'search-results';
+    searchResultsContainer.style.display = 'none';
+    container.insertBefore(searchResultsContainer, searchBox.nextSibling);
+    
+    // Import fuzzy search dynamically to avoid circular dependencies
+    import('./utils/fuzzySearch').then(({ sortByFuzzyScore }) => {
+        searchBox.addEventListener('input', (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            const searchTerm = target.value.trim();
             
-            // Hide empty categories
-            categoryContainers.forEach((container, index) => {
-                const visibleNodes = Array.from(container.querySelectorAll('.node-palette-item')).some(
-                    item => (item as HTMLElement).style.display !== 'none'
+            // Get all node items
+            const nodeItems = container.querySelectorAll('.node-palette-item');
+            const categoryHeaders = container.querySelectorAll('.node-category-header');
+            const categoryContainers = container.querySelectorAll('.node-category-container');
+            
+            if (searchTerm) {
+                // Use fuzzy search to sort and filter nodes
+                const allNodes = Array.from(nodeItems);
+                const searchResults = sortByFuzzyScore(
+                    allNodes, 
+                    searchTerm, 
+                    (node) => {
+                        const el = node as HTMLElement;
+                        return `${el.textContent} ${el.dataset.nodeType} ${el.dataset.category} ${el.dataset.description}`;
+                    }
                 );
                 
-                (container as HTMLElement).style.display = visibleNodes ? 'block' : 'none';
-                (categoryHeaders[index] as HTMLElement).style.display = visibleNodes ? 'block' : 'none';
-            });
-        } else {
-            // Show all nodes when search is empty
-            nodeItems.forEach(item => (item as HTMLElement).style.display = 'block');
+                // Hide all nodes first
+                nodeItems.forEach(item => (item as HTMLElement).style.display = 'none');
+                
+                // Show matched nodes with highlighting
+                searchResults.forEach(result => {
+                    const node = result.item as HTMLElement;
+                    node.style.display = 'block';
+                    
+                    // Add score indicator for debugging (can be removed in production)
+                    node.dataset.score = result.score.toFixed(2);
+                });
+                
+                // Hide empty categories
+                categoryContainers.forEach((container, index) => {
+                    const visibleNodes = Array.from(container.querySelectorAll('.node-palette-item')).some(
+                        item => (item as HTMLElement).style.display !== 'none'
+                    );
+                    
+                    (container as HTMLElement).style.display = visibleNodes ? 'block' : 'none';
+                    (categoryHeaders[index] as HTMLElement).style.display = visibleNodes ? 'block' : 'none';
+                });
+                
+                // If no results, show a message
+                const hasResults = searchResults.length > 0;
+                if (!hasResults) {
+                    const noResultsDiv = document.createElement('div');
+                    noResultsDiv.className = 'no-results';
+                    noResultsDiv.textContent = 'No matching nodes found';
+                    // Clear and update the search results container
+                    searchResultsContainer.innerHTML = '';
+                    searchResultsContainer.appendChild(noResultsDiv);
+                    searchResultsContainer.style.display = 'block';
+                } else {
+                    searchResultsContainer.style.display = 'none';
+                }
+            } else {
+                // Show all nodes when search is empty
+                nodeItems.forEach(item => (item as HTMLElement).style.display = 'block');
+                categoryHeaders.forEach(header => (header as HTMLElement).style.display = 'block');
+                categoryContainers.forEach(container => (container as HTMLElement).style.display = 'block');
+                searchResultsContainer.style.display = 'none';
+            }
+        });
+    });
+    
+    // Add keyboard navigation between nodes
+    setupKeyboardNavigation(container);
+}
+
+// Helper function to set up keyboard navigation between nodes
+function setupKeyboardNavigation(container: HTMLElement) {
+    container.addEventListener('keydown', (e) => {
+        if (!['Tab', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+        
+        const focusableItems = Array.from(
+            container.querySelectorAll('.node-palette-item:not([style*="display: none"])') 
+        ) as HTMLElement[];
+        
+        if (focusableItems.length === 0) return;
+        
+        const currentIndex = focusableItems.findIndex(item => item === document.activeElement);
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextIndex = currentIndex < focusableItems.length - 1 ? currentIndex + 1 : 0;
+            focusableItems[nextIndex].focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prevIndex = currentIndex > 0 ? currentIndex - 1 : focusableItems.length - 1;
+            focusableItems[prevIndex].focus();
         }
     });
 }

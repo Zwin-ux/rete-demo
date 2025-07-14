@@ -2,6 +2,10 @@ import { initEditor, initNodePalette, createNode, handleNodeDrop } from './edito
 import { loadWorkflow } from './utils/workflowUtils';
 import { DEMO_CONFIG, isDemoMode } from './config/demo';
 import { createAIAgentDemoWorkflow } from './workflows/aiAgentDemo';
+import { createSocialMediaAggregator } from './workflows/social-media-aggregator';
+import * as React from 'react';
+import * as ReactDOM from 'react-dom/client';
+import { ApiConfigPanel } from './components/ApiConfigPanel';
 
 declare global {
   interface Window {
@@ -62,6 +66,60 @@ async function initializeApp() {
 
     // Make editor available globally for debugging
     window.editor = editor;
+    
+    // Add API configuration panel
+    const apiConfigContainer = document.createElement('div');
+    document.body.appendChild(apiConfigContainer);
+    const apiConfigRoot = ReactDOM.createRoot(apiConfigContainer);
+    apiConfigRoot.render(React.createElement(ApiConfigPanel, { editor }));
+    
+    // Add workflow selection dropdown
+    const workflowSelector = document.createElement('select');
+    workflowSelector.style.position = 'absolute';
+    workflowSelector.style.top = '10px';
+    workflowSelector.style.left = '10px';
+    workflowSelector.style.zIndex = '1000';
+    workflowSelector.style.padding = '8px';
+    workflowSelector.style.borderRadius = '4px';
+    
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select a workflow...';
+    workflowSelector.appendChild(defaultOption);
+    
+    const aiAgentOption = document.createElement('option');
+    aiAgentOption.value = 'ai-agent';
+    aiAgentOption.textContent = 'AI Agent Workflow';
+    workflowSelector.appendChild(aiAgentOption);
+    
+    const socialMediaOption = document.createElement('option');
+    socialMediaOption.value = 'social-media';
+    socialMediaOption.textContent = 'Social Media Aggregator';
+    workflowSelector.appendChild(socialMediaOption);
+    
+    document.body.appendChild(workflowSelector);
+    
+    workflowSelector.addEventListener('change', async () => {
+      // Clear the editor
+      editor.getNodes().forEach(node => editor.removeNode(node.id));
+      
+      // Load the selected workflow
+      if (workflowSelector.value === 'ai-agent') {
+        try {
+          await createAIAgentDemoWorkflow(editor, area);
+          console.log('Loaded AI Agent Demo Workflow');
+        } catch (error) {
+          console.error('Failed to load AI Agent Demo Workflow:', error);
+        }
+      } else if (workflowSelector.value === 'social-media') {
+        try {
+          await createSocialMediaAggregator(editor, area);
+          console.log('Loaded Social Media Aggregator Workflow');
+        } catch (error) {
+          console.error('Failed to load Social Media Aggregator Workflow:', error);
+        }
+      }
+    });
     
     // Load the AI Agent Demo Workflow by default
     try {

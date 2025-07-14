@@ -14,9 +14,41 @@ body, html {
     text-align: center;
 }
 
+/* Editor Header */
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  height: 60px;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.header-left h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #ddd;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 #app {
     display: flex;
-    height: calc(100vh - 100px); /* Adjusted for header and footer */
+    flex-direction: column;
+    height: 100vh;
+}
+
+.editor-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
 }
 
 .sidebar {
@@ -123,6 +155,73 @@ body, html {
     position: absolute;
     bottom: 0;
     width: 100%;
+}
+
+/* Node Group styles */
+.node-group {
+  position: absolute;
+  border: 2px solid;
+  border-radius: 8px;
+  overflow: visible;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  z-index: -1;
+}
+
+/* Group color variants */
+.node-group-3498db { /* Blue */
+  border-color: #3498db;
+  background-color: rgba(52, 152, 219, 0.12);
+}
+
+.node-group-2ecc71 { /* Green */
+  border-color: #2ecc71;
+  background-color: rgba(46, 204, 113, 0.12);
+}
+
+.node-group-e74c3c { /* Red */
+  border-color: #e74c3c;
+  background-color: rgba(231, 76, 60, 0.12);
+}
+
+.node-group-9b59b6 { /* Purple */
+  border-color: #9b59b6;
+  background-color: rgba(155, 89, 182, 0.12);
+}
+
+.node-group-f39c12 { /* Orange */
+  border-color: #f39c12;
+  background-color: rgba(243, 156, 18, 0.12);
+}
+
+.node-group-1abc9c { /* Teal */
+  border-color: #1abc9c;
+  background-color: rgba(26, 188, 156, 0.12);
+}
+
+.node-group-34495e { /* Dark Blue */
+  border-color: #34495e;
+  background-color: rgba(52, 73, 94, 0.12);
+}
+
+/* Group creation mode */
+.group-creation-mode .node {
+  cursor: pointer;
+}
+
+.group-creation-mode .node:hover {
+  outline: 2px dashed #3498db;
+}
+
+.group-selected {
+  outline: 2px solid #3498db !important;
+  box-shadow: 0 0 8px rgba(52, 152, 219, 0.5) !important;
+}
+
+/* Group highlighted state */
+.group-highlighted {
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
+  z-index: -2;
 }
 
 /* Node styling */
